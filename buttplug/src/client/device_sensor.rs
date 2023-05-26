@@ -63,7 +63,7 @@ impl ButtplugDeviceSensor {
     self.subscribable
   }
 
-  pub fn subscribe_sensor(
+  pub fn subscribe(
     &self,
     sensor_index: u32,
     sensor_type: SensorType,
@@ -78,7 +78,7 @@ impl ButtplugDeviceSensor {
     self.message_sender.send_message_expect_ok(msg)
   }
 
-  pub fn unsubscribe_sensor(
+  pub fn unsubscribe(
     &self,
     sensor_index: u32,
     sensor_type: SensorType,
@@ -94,7 +94,7 @@ impl ButtplugDeviceSensor {
     self.message_sender.send_message_expect_ok(msg)
   }
 
-  fn read_sensor(&self) -> ButtplugClientResultFuture<Vec<i32>> {
+  fn read(&self) -> ButtplugClientResultFuture<Vec<i32>> {
     if !self.readable {
       return create_boxed_future_client_error(
         ButtplugDeviceError::MessageNotSupported(ButtplugDeviceMessageType::SensorReadCmd).into(),
@@ -118,7 +118,13 @@ impl ButtplugDeviceSensor {
   }
 
   pub fn battery_level(&self) -> ButtplugClientResultFuture<f64> {
-    let send_fut = self.read_sensor();
+    if self.sensor_type() != SensorType::Battery {      
+      return create_boxed_future_client_error(
+        ButtplugDeviceError::UnhandledCommand(format!("Device sensor is not a Battery sensor"))
+        .into(),
+      );
+    }
+    let send_fut = self.read();
     Box::pin(async move {
       let data = send_fut.await?;
       let battery_level = data[0];
@@ -127,7 +133,13 @@ impl ButtplugDeviceSensor {
   }
 
   pub fn rssi_level(&self) -> ButtplugClientResultFuture<i32> {
-    let send_fut = self.read_sensor();
+    if self.sensor_type() != SensorType::RSSI {      
+      return create_boxed_future_client_error(
+        ButtplugDeviceError::UnhandledCommand(format!("Device sensor is not a RSSI sensor"))
+        .into(),
+      );
+    }
+    let send_fut = self.read();
     Box::pin(async move {
       let data = send_fut.await?;
       Ok(data[0])
