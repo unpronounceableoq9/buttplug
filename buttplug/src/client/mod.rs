@@ -9,6 +9,8 @@
 pub mod client_event_loop;
 pub mod client_message_sorter;
 pub mod device;
+pub mod device_actuator;
+pub mod device_sensor;
 
 use crate::{
   core::{
@@ -34,6 +36,7 @@ use crate::{
 };
 use client_event_loop::{ButtplugClientEventLoop, ButtplugClientRequest};
 use dashmap::DashMap;
+#[allow(deprecated)]
 pub use device::{
   ButtplugClientDevice,
   ButtplugClientDeviceEvent,
