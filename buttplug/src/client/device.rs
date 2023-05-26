@@ -9,7 +9,7 @@
 
 use super::{
   create_boxed_future_client_error, device_actuator::{ButtplugDeviceActuator, DeviceActuatorType},
-  device_sensor::ButtplugDeviceSensor, ButtplugClientMessageSender, ButtplugClientResultFuture, ButtplugClientError,
+  device_sensor::ButtplugDeviceSensor, ButtplugClientMessageSender, ButtplugClientResultFuture, ButtplugClientError, device_raw::ButtplugDeviceRawEndpoint,
 };
 use crate::{
   core::{
@@ -166,6 +166,8 @@ pub struct ButtplugClientDevice {
   actuators: Vec<ButtplugDeviceActuator>,
   // Represents all of the inputs on the device
   sensors: Vec<ButtplugDeviceSensor>,
+  // Represents all endpoints exposed through raw commands
+  raw_endpoints: Vec<ButtplugDeviceRawEndpoint>
 }
 
 #[allow(deprecated)]
@@ -217,6 +219,11 @@ impl ButtplugClientDevice {
         message_attributes,
         message_sender,
       ),
+      raw_endpoints: ButtplugDeviceRawEndpoint::from_message_attributes(
+        index,
+        message_attributes,
+        message_sender
+      )
     }
   }
 
@@ -282,6 +289,10 @@ impl ButtplugClientDevice {
 
   pub fn sensors(&self) -> &Vec<ButtplugDeviceSensor> {
     &self.sensors
+  }
+
+  pub fn raw_endpoints(&self) -> &Vec<ButtplugDeviceRawEndpoint> {
+    &self.raw_endpoints
   }
 
   fn get_actuators_by_type(&self, actuator_type: DeviceActuatorType) -> Vec<ButtplugDeviceActuator> {
@@ -715,6 +726,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
+  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceSensor instance].subscribe() to access device sensor subscription."]
   pub fn subscribe_sensor(
     &self,
     sensor_index: u32,
@@ -730,6 +742,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
+  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceSensor instance].subscribe() to access device sensor unsubscription."]
   pub fn unsubscribe_sensor(
     &self,
     sensor_index: u32,
@@ -745,6 +758,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
+  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].write() to access device raw functionality."]
   pub fn raw_write(
     &self,
     endpoint: Endpoint,
@@ -765,6 +779,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
+  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].read() to access device raw functionality."]
   pub fn raw_read(
     &self,
     endpoint: Endpoint,
@@ -799,6 +814,7 @@ impl ButtplugClientDevice {
     .boxed()
   }
 
+  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].subscribe() to access device raw functionality."]
   pub fn raw_subscribe(&self, endpoint: Endpoint) -> ButtplugClientResultFuture {
     if self.message_attributes.raw_subscribe_cmd().is_none() {
       return create_boxed_future_client_error(
@@ -810,6 +826,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
+  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].unsubscribe() to access device raw functionality."]
   pub fn raw_unsubscribe(&self, endpoint: Endpoint) -> ButtplugClientResultFuture {
     if self.message_attributes.raw_subscribe_cmd().is_none() {
       return create_boxed_future_client_error(
