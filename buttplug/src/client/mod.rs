@@ -11,6 +11,7 @@ pub mod client_message_sorter;
 pub mod device;
 pub mod device_actuator;
 pub mod device_sensor;
+pub mod device_raw;
 
 use crate::{
   core::{
