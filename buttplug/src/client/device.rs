@@ -317,7 +317,7 @@ impl ButtplugClientDevice {
     }
   }
 
-  pub fn vibrators(&self) -> Vec<ButtplugDeviceActuator> {
+  pub fn vibrate_actuators(&self) -> Vec<ButtplugDeviceActuator> {
     self.get_actuators_by_type(DeviceActuatorType::Vibrate)
   }
 
@@ -325,7 +325,7 @@ impl ButtplugClientDevice {
     self.run_actuator_func(DeviceActuatorType::Vibrate, |actuator| actuator.vibrate(scalar))
   }
 
-  pub fn rotators(&self) -> Vec<ButtplugDeviceActuator> {
+  pub fn rotate_actuators(&self) -> Vec<ButtplugDeviceActuator> {
     self.get_actuators_by_type(DeviceActuatorType::Rotate)
   }
 
@@ -333,7 +333,7 @@ impl ButtplugClientDevice {
     self.run_actuator_func(DeviceActuatorType::Rotate, |actuator| actuator.rotate(scalar))
   }
 
-  pub fn oscillators(&self) -> Vec<ButtplugDeviceActuator> {
+  pub fn oscillate_actuators(&self) -> Vec<ButtplugDeviceActuator> {
     self.get_actuators_by_type(DeviceActuatorType::Oscillate)
   }
 
@@ -341,7 +341,7 @@ impl ButtplugClientDevice {
     self.run_actuator_func(DeviceActuatorType::Oscillate, |actuator| actuator.oscillate(scalar))
   }
 
-  pub fn inflators(&self) -> Vec<ButtplugDeviceActuator> {
+  pub fn inflate_actuators(&self) -> Vec<ButtplugDeviceActuator> {
     self.get_actuators_by_type(DeviceActuatorType::Inflate)
   }
 
@@ -349,7 +349,7 @@ impl ButtplugClientDevice {
     self.run_actuator_func(DeviceActuatorType::Inflate, |actuator| actuator.inflate(scalar))
   }
 
-  pub fn constrictors(&self) -> Vec<ButtplugDeviceActuator> {
+  pub fn constrict_actuators(&self) -> Vec<ButtplugDeviceActuator> {
     self.get_actuators_by_type(DeviceActuatorType::Constrict)
   }
 
@@ -357,7 +357,7 @@ impl ButtplugClientDevice {
     self.run_actuator_func(DeviceActuatorType::Constrict, |actuator| actuator.inflate(scalar))
   }
 
-  pub fn positions(&self) -> Vec<ButtplugDeviceActuator> {
+  pub fn position_actuators(&self) -> Vec<ButtplugDeviceActuator> {
     self.get_actuators_by_type(DeviceActuatorType::Position)
   }
 
@@ -365,7 +365,7 @@ impl ButtplugClientDevice {
     self.run_actuator_func(DeviceActuatorType::Position, |actuator| actuator.position(scalar))
   }
 
-  pub fn rotators_with_direction(&self) -> Vec<ButtplugDeviceActuator> {
+  pub fn rotators_with_direction_actuators(&self) -> Vec<ButtplugDeviceActuator> {
     self.get_actuators_by_type(DeviceActuatorType::RotateWithDirection)
   }
 
@@ -373,7 +373,7 @@ impl ButtplugClientDevice {
     self.run_actuator_func(DeviceActuatorType::RotateWithDirection, |actuator| actuator.rotate_with_direction(scalar, clockwise))
   }
 
-  pub fn position_with_duration(&self) -> Vec<ButtplugDeviceActuator> {
+  pub fn position_with_duration_actuators(&self) -> Vec<ButtplugDeviceActuator> {
     self.get_actuators_by_type(DeviceActuatorType::RotateWithDirection)
   }
 
@@ -519,13 +519,13 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
+  #[deprecated = "Method will be removed in next major version. Use device.vibrate_actuators() to access device vibrators."]
   pub fn vibrate_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     self.scalar_value_attributes(&ActuatorType::Vibrate)
   }
 
   /// Commands device to vibrate, assuming it has the features to do so.
-  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
+  #[deprecated = "Method will be removed in next major version. Use device.vibrate_all() or [ButtplugDeviceActuator instance].vibrate() to access device vibrators."]
   pub fn vibrate(&self, speed_cmd: &ScalarValueCommand) -> ButtplugClientResultFuture {
     #[allow(deprecated)]
     self.scalar_from_value_command(
@@ -535,13 +535,13 @@ impl ButtplugClientDevice {
     )
   }
 
-  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
+  #[deprecated = "Method will be removed in next major version. Use device.oscillate_actuators() to access device oscillators."]
   pub fn oscillate_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     self.scalar_value_attributes(&ActuatorType::Oscillate)
   }
 
   /// Commands device to vibrate, assuming it has the features to do so.
-  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
+  #[deprecated = "Method will be removed in next major version. Use device.oscillate_all() or [ButtplugDeviceActuator instance].oscillate() to access device oscillators."]
   pub fn oscillate(&self, speed_cmd: &ScalarValueCommand) -> ButtplugClientResultFuture {
     #[allow(deprecated)]
     self.scalar_from_value_command(
@@ -606,7 +606,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use device.actuators() instead to access device actuators."]
+  #[deprecated = "Method will be removed in next major version. Use device.position_with_duration_actuators() instead to access device actuators."]
   pub fn linear_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     if let Some(attrs) = self.message_attributes.linear_cmd() {
       attrs.clone()
@@ -616,7 +616,7 @@ impl ButtplugClientDevice {
   }
 
   /// Commands device to move linearly, assuming it has the features to do so.
-  #[deprecated = "Method will be removed in next major version. Use device.actuators() instead to access device actuators."]
+  #[deprecated = "Method will be removed in next major version. Use device.position_with_duration_all() or [ButtplugDeviceActuator instance].position_with_duration() to access device linear movement actuators."]
   pub fn linear(&self, linear_cmd: &LinearCommand) -> ButtplugClientResultFuture {
     if self.message_attributes.linear_cmd().is_none() {
       return create_boxed_future_client_error(
@@ -666,7 +666,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use device.actuators() instead to access device actuators."]
+  #[deprecated = "Method will be removed in next major version. Use device.rotation_with_direction_actuators() instead to access device actuators."]
   pub fn rotate_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     if let Some(attrs) = self.message_attributes.linear_cmd() {
       attrs.clone()
@@ -676,7 +676,7 @@ impl ButtplugClientDevice {
   }
 
   /// Commands device to rotate, assuming it has the features to do so.
-  #[deprecated = "Method will be removed in next major version. Use device.actuators() instead to access device actuators."]
+  #[deprecated = "Method will be removed in next major version. Use device.rotation_with_direction_all() or [ButtplugDeviceActuator instance].rotation_wth_direction() to access device rotation actuators."]
   pub fn rotate(&self, rotate_cmd: &RotateCommand) -> ButtplugClientResultFuture {
     if self.message_attributes.rotate_cmd().is_none() {
       return create_boxed_future_client_error(
