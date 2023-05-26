@@ -8,37 +8,19 @@
 //! Representation and management of devices connected to the server.
 
 use super::{
-  ButtplugClientResultFuture,
-  create_boxed_future_client_error, 
-  ButtplugClientMessageSender
+  create_boxed_future_client_error, device_actuator::{ButtplugDeviceActuator, DeviceActuatorType},
+  device_sensor::ButtplugDeviceSensor, ButtplugClientMessageSender, ButtplugClientResultFuture, ButtplugClientError,
 };
 use crate::{
   core::{
     errors::{ButtplugDeviceError, ButtplugError, ButtplugMessageError},
     message::{
-      ActuatorType,
-      ButtplugCurrentSpecClientMessage,
-      ButtplugCurrentSpecServerMessage,
-      ButtplugDeviceMessageType,
-      ClientDeviceMessageAttributes,
-      ClientGenericDeviceMessageAttributes,
-      DeviceMessageInfo,
-      Endpoint,
-      LinearCmd,
-      RawReadCmd,
-      RawSubscribeCmd,
-      RawUnsubscribeCmd,
-      RawWriteCmd,
-      RotateCmd,
-      RotationSubcommand,
-      ScalarCmd,
-      ScalarSubcommand,
-      SensorReadCmd,
-      SensorSubscribeCmd,
-      SensorType,
-      SensorUnsubscribeCmd,
-      StopDeviceCmd,
-      VectorSubcommand,
+      ActuatorType, ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage,
+      ButtplugDeviceMessageType, ClientDeviceMessageAttributes,
+      ClientGenericDeviceMessageAttributes, DeviceMessageInfo, Endpoint, LinearCmd, RawReadCmd,
+      RawSubscribeCmd, RawUnsubscribeCmd, RawWriteCmd, RotateCmd, RotationSubcommand, ScalarCmd,
+      ScalarSubcommand, SensorSubscribeCmd, SensorType, SensorUnsubscribeCmd,
+      StopDeviceCmd, VectorSubcommand,
     },
   },
   util::stream::convert_broadcast_receiver_to_stream,
@@ -74,6 +56,7 @@ pub enum ButtplugClientDeviceEvent {
 ///
 /// Allows users to easily specify speeds across different vibration features in
 /// a device. Units are in absolute speed values (0.0-1.0).
+#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
 pub enum ScalarCommand {
   /// Sets all vibration features of a device to the same speed.
   Scalar((f64, ActuatorType)),
@@ -91,6 +74,7 @@ pub enum ScalarCommand {
 ///
 /// Allows users to easily specify speeds across different vibration features in
 /// a device. Units are in absolute speed values (0.0-1.0).
+#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
 pub enum ScalarValueCommand {
   /// Sets all vibration features of a device to the same speed.
   ScalarValue(f64),
@@ -109,6 +93,7 @@ pub enum ScalarValueCommand {
 /// Allows users to easily specify speeds/directions across different rotation
 /// features in a device. Units are in absolute speed (0.0-1.0), and clockwise
 /// direction (clockwise if true, counterclockwise if false)
+#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
 pub enum RotateCommand {
   /// Sets all rotation features of a device to the same speed/direction.
   Rotate(f64, bool),
@@ -127,6 +112,7 @@ pub enum RotateCommand {
 /// Allows users to easily specify position/durations across different rotation
 /// features in a device. Units are in absolute position (0.0-1.0) and
 /// millliseconds of movement duration.
+#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
 pub enum LinearCommand {
   /// Sets all linear features of a device to the same position/duration.
   Linear(u32, f64),
@@ -176,8 +162,13 @@ pub struct ButtplugClientDevice {
   /// [ButtplugClientDevice] instance is still connected to the
   /// [ButtplugServer][crate::server::ButtplugServer].
   client_connected: Arc<AtomicBool>,
+  // Represents all of the outputs on the device
+  actuators: Vec<ButtplugDeviceActuator>,
+  // Represents all of the inputs on the device
+  sensors: Vec<ButtplugDeviceSensor>,
 }
 
+#[allow(deprecated)]
 impl ButtplugClientDevice {
   /// Creates a new [ButtplugClientDevice] instance
   ///
@@ -216,6 +207,16 @@ impl ButtplugClientDevice {
       internal_event_sender: event_sender,
       device_connected,
       client_connected,
+      actuators: ButtplugDeviceActuator::from_client_device_message_attributes(
+        index,
+        message_attributes,
+        message_sender,
+      ),
+      sensors: ButtplugDeviceSensor::from_sensor_attributes(
+        index,
+        message_attributes,
+        message_sender,
+      ),
     }
   }
 
@@ -242,6 +243,173 @@ impl ButtplugClientDevice {
     )))
   }
 
+  /// Commands device to stop all movement.
+  pub fn stop(&self) -> ButtplugClientResultFuture {
+    // All devices accept StopDeviceCmd
+    self
+      .event_loop_sender
+      .send_message_expect_ok(StopDeviceCmd::new(self.index).into())
+  }
+
+  pub(super) fn set_device_connected(&self, connected: bool) {
+    self.device_connected.store(connected, Ordering::SeqCst);
+  }
+
+  pub(super) fn set_client_connected(&self, connected: bool) {
+    self.client_connected.store(connected, Ordering::SeqCst);
+  }
+
+  pub(super) fn queue_event(&self, event: ButtplugClientDeviceEvent) {
+    if self.internal_event_sender.receiver_count() == 0 {
+      // We can drop devices before we've hooked up listeners or after the device manager drops,
+      // which is common, so only show this when in debug.
+      debug!("No handlers for device event, dropping event: {:?}", event);
+      return;
+    }
+    self
+      .internal_event_sender
+      .send(event)
+      .expect("Checked for receivers already.");
+  }
+
+  // NEW DEVICE COMMAND CODE
+  //
+  // Allows easy access to all actuators/sensors. Per actuator/sensor commands can be accessed by
+  // advanced users using accessors.
+  pub fn actuators(&self) -> &Vec<ButtplugDeviceActuator> {
+    &self.actuators
+  }
+
+  pub fn sensors(&self) -> &Vec<ButtplugDeviceSensor> {
+    &self.sensors
+  }
+
+  fn get_actuators_by_type(&self, actuator_type: DeviceActuatorType) -> Vec<ButtplugDeviceActuator> {
+    self.actuators.iter().filter(|actuator| actuator.actuator_type() == actuator_type).cloned().collect()
+  }
+
+  fn run_actuator_func(&self, actuator_type: DeviceActuatorType, func: impl Fn(&ButtplugDeviceActuator) -> ButtplugClientResultFuture) -> ButtplugClientResultFuture {
+    let actuators = self.get_actuators_by_type(actuator_type);
+    if actuators.is_empty() {
+      create_boxed_future_client_error(
+        ButtplugDeviceError::UnhandledCommand(format!("Device does not have any actuators that support the {actuator_type:?} command"))
+          .into(),
+      )
+    } else {
+      let futures = futures::future::join_all(actuators.iter().map(|actuator| func(actuator)));
+      async move {
+        // Vec<Result<T, E>> can be collected into Result<Vec<T>, E> if we only care about the first
+        // error. Neat!
+        let results: Result<Vec<()>, ButtplugClientError> = futures.await.into_iter().collect();
+        results.map(|_| Ok(()))?
+      }.boxed()
+    }
+  }
+
+  pub fn vibrators(&self) -> Vec<ButtplugDeviceActuator> {
+    self.get_actuators_by_type(DeviceActuatorType::Vibrate)
+  }
+
+  pub fn vibrate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(DeviceActuatorType::Vibrate, |actuator| actuator.vibrate(scalar))
+  }
+
+  pub fn rotators(&self) -> Vec<ButtplugDeviceActuator> {
+    self.get_actuators_by_type(DeviceActuatorType::Rotate)
+  }
+
+  pub fn rotate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(DeviceActuatorType::Rotate, |actuator| actuator.rotate(scalar))
+  }
+
+  pub fn oscillators(&self) -> Vec<ButtplugDeviceActuator> {
+    self.get_actuators_by_type(DeviceActuatorType::Oscillate)
+  }
+
+  pub fn oscillate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(DeviceActuatorType::Oscillate, |actuator| actuator.oscillate(scalar))
+  }
+
+  pub fn inflators(&self) -> Vec<ButtplugDeviceActuator> {
+    self.get_actuators_by_type(DeviceActuatorType::Inflate)
+  }
+
+  pub fn inflate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(DeviceActuatorType::Inflate, |actuator| actuator.inflate(scalar))
+  }
+
+  pub fn constrictors(&self) -> Vec<ButtplugDeviceActuator> {
+    self.get_actuators_by_type(DeviceActuatorType::Constrict)
+  }
+
+  pub fn constrict_all(&self, scalar: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(DeviceActuatorType::Constrict, |actuator| actuator.inflate(scalar))
+  }
+
+  pub fn positions(&self) -> Vec<ButtplugDeviceActuator> {
+    self.get_actuators_by_type(DeviceActuatorType::Position)
+  }
+
+  pub fn position_all(&self, scalar: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(DeviceActuatorType::Position, |actuator| actuator.position(scalar))
+  }
+
+  pub fn rotators_with_direction(&self) -> Vec<ButtplugDeviceActuator> {
+    self.get_actuators_by_type(DeviceActuatorType::RotateWithDirection)
+  }
+
+  pub fn rotate_with_direction_all(&self, scalar: f64, clockwise: bool) -> ButtplugClientResultFuture {
+    self.run_actuator_func(DeviceActuatorType::RotateWithDirection, |actuator| actuator.rotate_with_direction(scalar, clockwise))
+  }
+
+  pub fn position_with_duration(&self) -> Vec<ButtplugDeviceActuator> {
+    self.get_actuators_by_type(DeviceActuatorType::RotateWithDirection)
+  }
+
+  pub fn position_with_duration_all(&self, position: f64, duration: u32) -> ButtplugClientResultFuture {
+    self.run_actuator_func(DeviceActuatorType::PositionWithDuration, |actuator| actuator.position_with_duration(position, duration))
+  }
+
+  fn get_sensor_by_type(&self, sensor_type: &SensorType) -> Vec<ButtplugDeviceSensor> {
+    self.sensors.iter().filter(|sensor| sensor.sensor_type() == *sensor_type).cloned().collect()
+  }
+
+  pub fn has_battery_level(&self) -> bool {
+    !self.get_sensor_by_type(&SensorType::Battery).is_empty()
+  }
+
+  pub fn battery_level(&self) -> ButtplugClientResultFuture<f64> {
+    let battery_sensor = self.get_sensor_by_type(&SensorType::Battery);
+    if battery_sensor.is_empty() {
+      create_boxed_future_client_error(
+        ButtplugDeviceError::UnhandledCommand(format!("Device does not have a battery readout"))
+          .into(),
+      )
+    } else {
+      battery_sensor[0].battery_level()
+    }
+  }
+
+  pub fn has_rssi_level(&self) -> bool {
+    !self.get_sensor_by_type(&SensorType::RSSI).is_empty()
+  }
+
+  pub fn rssi_level(&self) -> ButtplugClientResultFuture<i32> {
+    let rssi_sensor = self.get_sensor_by_type(&SensorType::RSSI);
+    if rssi_sensor.is_empty() {
+      create_boxed_future_client_error(
+        ButtplugDeviceError::UnhandledCommand(format!("Device does not have a RSSI readout"))
+          .into(),
+      )
+    } else {
+      rssi_sensor[0].rssi_level()
+    }
+  }
+
+  // OLD DEVICE COMMAND CODE
+  //
+  // This will all be removed in v8
+
   fn scalar_value_attributes(
     &self,
     actuator: &ActuatorType,
@@ -257,6 +425,7 @@ impl ButtplugClientDevice {
     }
   }
 
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
   pub fn scalar_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     if let Some(attrs) = self.message_attributes.scalar_cmd() {
       attrs.clone()
@@ -339,12 +508,15 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
   pub fn vibrate_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     self.scalar_value_attributes(&ActuatorType::Vibrate)
   }
 
   /// Commands device to vibrate, assuming it has the features to do so.
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
   pub fn vibrate(&self, speed_cmd: &ScalarValueCommand) -> ButtplugClientResultFuture {
+    #[allow(deprecated)]
     self.scalar_from_value_command(
       speed_cmd,
       &ActuatorType::Vibrate,
@@ -352,12 +524,15 @@ impl ButtplugClientDevice {
     )
   }
 
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
   pub fn oscillate_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     self.scalar_value_attributes(&ActuatorType::Oscillate)
   }
 
   /// Commands device to vibrate, assuming it has the features to do so.
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
   pub fn oscillate(&self, speed_cmd: &ScalarValueCommand) -> ButtplugClientResultFuture {
+    #[allow(deprecated)]
     self.scalar_from_value_command(
       speed_cmd,
       &ActuatorType::Oscillate,
@@ -365,6 +540,7 @@ impl ButtplugClientDevice {
     )
   }
 
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
   pub fn scalar(&self, scalar_cmd: &ScalarCommand) -> ButtplugClientResultFuture {
     if self.message_attributes.scalar_cmd().is_none() {
       return create_boxed_future_client_error(
@@ -419,6 +595,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() instead to access device actuators."]
   pub fn linear_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     if let Some(attrs) = self.message_attributes.linear_cmd() {
       attrs.clone()
@@ -428,6 +605,7 @@ impl ButtplugClientDevice {
   }
 
   /// Commands device to move linearly, assuming it has the features to do so.
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() instead to access device actuators."]
   pub fn linear(&self, linear_cmd: &LinearCommand) -> ButtplugClientResultFuture {
     if self.message_attributes.linear_cmd().is_none() {
       return create_boxed_future_client_error(
@@ -477,6 +655,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() instead to access device actuators."]
   pub fn rotate_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     if let Some(attrs) = self.message_attributes.linear_cmd() {
       attrs.clone()
@@ -486,6 +665,7 @@ impl ButtplugClientDevice {
   }
 
   /// Commands device to rotate, assuming it has the features to do so.
+  #[deprecated = "Method will be removed in next major version. Use device.actuators() instead to access device actuators."]
   pub fn rotate(&self, rotate_cmd: &RotateCommand) -> ButtplugClientResultFuture {
     if self.message_attributes.rotate_cmd().is_none() {
       return create_boxed_future_client_error(
@@ -565,77 +745,6 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  fn read_single_sensor(&self, sensor_type: &SensorType) -> ButtplugClientResultFuture<Vec<i32>> {
-    if self.message_attributes.sensor_read_cmd().is_none() {
-      return create_boxed_future_client_error(
-        ButtplugDeviceError::MessageNotSupported(ButtplugDeviceMessageType::SensorReadCmd).into(),
-      );
-    }
-    let sensor_indexes: Vec<u32> = self
-      .message_attributes
-      .sensor_read_cmd()
-      .as_ref()
-      .expect("Already check existence")
-      .iter()
-      .enumerate()
-      .filter(|x| *x.1.sensor_type() == *sensor_type)
-      .map(|x| x.0 as u32)
-      .collect();
-    if sensor_indexes.len() != 1 {
-      return create_boxed_future_client_error(
-        ButtplugDeviceError::ProtocolSensorNotSupported(*sensor_type).into(),
-      );
-    }
-    let msg = SensorReadCmd::new(self.index, sensor_indexes[0], *sensor_type).into();
-    let reply = self.event_loop_sender.send_message(msg);
-    async move {
-      if let ButtplugCurrentSpecServerMessage::SensorReading(data) = reply.await? {
-        Ok(data.data().clone())
-      } else {
-        Err(
-          ButtplugError::ButtplugMessageError(ButtplugMessageError::UnexpectedMessageType(
-            "SensorReading".to_owned(),
-          ))
-          .into(),
-        )
-      }
-    }
-    .boxed()
-  }
-
-  fn has_sensor_read(&self, sensor_type: SensorType) -> bool {
-    if let Some(sensor_attrs) = self.message_attributes.sensor_read_cmd() {
-      sensor_attrs.iter().any(|x| *x.sensor_type() == sensor_type)
-    } else {
-      false
-    }
-  }
-
-  pub fn has_battery_level(&self) -> bool {
-    self.has_sensor_read(SensorType::Battery)
-  }
-
-  pub fn battery_level(&self) -> ButtplugClientResultFuture<f64> {
-    let send_fut = self.read_single_sensor(&SensorType::Battery);
-    Box::pin(async move {
-      let data = send_fut.await?;
-      let battery_level = data[0];
-      Ok(battery_level as f64 / 100.0f64)
-    })
-  }
-
-  pub fn has_rssi_level(&self) -> bool {
-    self.has_sensor_read(SensorType::RSSI)
-  }
-
-  pub fn rssi_level(&self) -> ButtplugClientResultFuture<i32> {
-    let send_fut = self.read_single_sensor(&SensorType::RSSI);
-    Box::pin(async move {
-      let data = send_fut.await?;
-      Ok(data[0])
-    })
-  }
-
   pub fn raw_write(
     &self,
     endpoint: Endpoint,
@@ -698,7 +807,7 @@ impl ButtplugClientDevice {
     }
     let msg =
       ButtplugCurrentSpecClientMessage::RawSubscribeCmd(RawSubscribeCmd::new(self.index, endpoint));
-      self.event_loop_sender.send_message_expect_ok(msg)
+    self.event_loop_sender.send_message_expect_ok(msg)
   }
 
   pub fn raw_unsubscribe(&self, endpoint: Endpoint) -> ButtplugClientResultFuture {
@@ -712,37 +821,9 @@ impl ButtplugClientDevice {
     ));
     self.event_loop_sender.send_message_expect_ok(msg)
   }
-
-  /// Commands device to stop all movement.
-  pub fn stop(&self) -> ButtplugClientResultFuture {
-    // All devices accept StopDeviceCmd
-    self.event_loop_sender.send_message_expect_ok(StopDeviceCmd::new(self.index).into())
-  }
-
-  pub(super) fn set_device_connected(&self, connected: bool) {
-    self.device_connected.store(connected, Ordering::SeqCst);
-  }
-
-  pub(super) fn set_client_connected(&self, connected: bool) {
-    self.client_connected.store(connected, Ordering::SeqCst);
-  }
-
-  pub(super) fn queue_event(&self, event: ButtplugClientDeviceEvent) {
-    if self.internal_event_sender.receiver_count() == 0 {
-      // We can drop devices before we've hooked up listeners or after the device manager drops,
-      // which is common, so only show this when in debug.
-      debug!("No handlers for device event, dropping event: {:?}", event);
-      return;
-    }
-    self
-      .internal_event_sender
-      .send(event)
-      .expect("Checked for receivers already.");
-  }
 }
 
-impl Eq for ButtplugClientDevice {
-}
+impl Eq for ButtplugClientDevice {}
 
 impl PartialEq for ButtplugClientDevice {
   fn eq(&self, other: &Self) -> bool {
