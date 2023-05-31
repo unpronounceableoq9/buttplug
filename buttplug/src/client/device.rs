@@ -8,7 +8,7 @@
 //! Representation and management of devices connected to the server.
 
 use super::{
-  create_boxed_future_client_error, device_actuator::{ButtplugDeviceActuator, DeviceActuatorType},
+  create_boxed_future_client_error, device_actuator::{Actuator, VibrateActuator, RotateActuator, OscillateActuator, InflateActuator, ConstrictActuator, PositionActuator, RotateWithDirectionActuator, PositionWithDurationActuator},
   device_sensor::ButtplugDeviceSensor, ButtplugClientMessageSender, ButtplugClientResultFuture, ButtplugClientError, device_raw::ButtplugDeviceRawEndpoint,
 };
 use crate::{
@@ -163,7 +163,7 @@ pub struct ButtplugClientDevice {
   /// [ButtplugServer][crate::server::ButtplugServer].
   client_connected: Arc<AtomicBool>,
   // Represents all of the outputs on the device
-  actuators: Vec<ButtplugDeviceActuator>,
+  actuators: Vec<Actuator>,
   // Represents all of the inputs on the device
   sensors: Vec<ButtplugDeviceSensor>,
   // Represents all endpoints exposed through raw commands
@@ -209,7 +209,7 @@ impl ButtplugClientDevice {
       internal_event_sender: event_sender,
       device_connected,
       client_connected,
-      actuators: ButtplugDeviceActuator::from_client_device_message_attributes(
+      actuators: Actuator::from_client_device_message_attributes(
         index,
         message_attributes,
         message_sender,
@@ -283,7 +283,7 @@ impl ButtplugClientDevice {
   //
   // Allows easy access to all actuators/sensors. Per actuator/sensor commands can be accessed by
   // advanced users using accessors.
-  pub fn actuators(&self) -> &Vec<ButtplugDeviceActuator> {
+  pub fn actuators(&self) -> &Vec<Actuator> {
     &self.actuators
   }
 
@@ -295,15 +295,11 @@ impl ButtplugClientDevice {
     &self.raw_endpoints
   }
 
-  fn get_actuators_by_type(&self, actuator_type: DeviceActuatorType) -> Vec<ButtplugDeviceActuator> {
-    self.actuators.iter().filter(|actuator| actuator.actuator_type() == actuator_type).cloned().collect()
-  }
-
-  fn run_actuator_func(&self, actuator_type: DeviceActuatorType, func: impl Fn(&ButtplugDeviceActuator) -> ButtplugClientResultFuture) -> ButtplugClientResultFuture {
-    let actuators = self.get_actuators_by_type(actuator_type);
+  fn run_actuator_func<T>(&self, actuators: &Vec<T>, func: impl Fn(&T) -> ButtplugClientResultFuture) -> ButtplugClientResultFuture {
     if actuators.is_empty() {
+      let typename = std::any::type_name::<T>();
       create_boxed_future_client_error(
-        ButtplugDeviceError::UnhandledCommand(format!("Device does not have any actuators that support the {actuator_type:?} command"))
+        ButtplugDeviceError::UnhandledCommand(format!("Device does not have any actuators that support the {typename} command"))
           .into(),
       )
     } else {
@@ -317,68 +313,68 @@ impl ButtplugClientDevice {
     }
   }
 
-  pub fn vibrate_actuators(&self) -> Vec<ButtplugDeviceActuator> {
-    self.get_actuators_by_type(DeviceActuatorType::Vibrate)
+  pub fn vibrate_actuators(&self) -> Vec<&VibrateActuator> {
+    self.actuators.iter().filter_map(|actuator| if let Actuator::Vibrate(vibrate) = actuator { Some(vibrate) } else { None }).collect()
   }
 
   pub fn vibrate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(DeviceActuatorType::Vibrate, |actuator| actuator.vibrate(scalar))
+    self.run_actuator_func(&self.vibrate_actuators(), |actuator| actuator.vibrate(scalar))
   }
 
-  pub fn rotate_actuators(&self) -> Vec<ButtplugDeviceActuator> {
-    self.get_actuators_by_type(DeviceActuatorType::Rotate)
+  pub fn rotate_actuators(&self) -> Vec<&RotateActuator> {
+    self.actuators.iter().filter_map(|actuator| if let Actuator::Rotate(act) = actuator { Some(act) } else { None }).collect()
   }
 
   pub fn rotate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(DeviceActuatorType::Rotate, |actuator| actuator.rotate(scalar))
+    self.run_actuator_func(&self.rotate_actuators(), |actuator| actuator.rotate(scalar))
   }
 
-  pub fn oscillate_actuators(&self) -> Vec<ButtplugDeviceActuator> {
-    self.get_actuators_by_type(DeviceActuatorType::Oscillate)
+  pub fn oscillate_actuators(&self) -> Vec<&OscillateActuator> {
+    self.actuators.iter().filter_map(|actuator| if let Actuator::Oscillate(act) = actuator { Some(act) } else { None }).collect()
   }
 
   pub fn oscillate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(DeviceActuatorType::Oscillate, |actuator| actuator.oscillate(scalar))
+    self.run_actuator_func(&self.oscillate_actuators(), |actuator| actuator.oscillate(scalar))
   }
 
-  pub fn inflate_actuators(&self) -> Vec<ButtplugDeviceActuator> {
-    self.get_actuators_by_type(DeviceActuatorType::Inflate)
+  pub fn inflate_actuators(&self) -> Vec<&InflateActuator> {
+    self.actuators.iter().filter_map(|actuator| if let Actuator::Inflate(act) = actuator { Some(act) } else { None }).collect()
   }
 
   pub fn inflate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(DeviceActuatorType::Inflate, |actuator| actuator.inflate(scalar))
+    self.run_actuator_func(&self.inflate_actuators(), |actuator| actuator.inflate(scalar))
   }
 
-  pub fn constrict_actuators(&self) -> Vec<ButtplugDeviceActuator> {
-    self.get_actuators_by_type(DeviceActuatorType::Constrict)
+  pub fn constrict_actuators(&self) -> Vec<&ConstrictActuator> {
+    self.actuators.iter().filter_map(|actuator| if let Actuator::Constrict(act) = actuator { Some(act) } else { None }).collect()
   }
 
   pub fn constrict_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(DeviceActuatorType::Constrict, |actuator| actuator.inflate(scalar))
+    self.run_actuator_func(&self.constrict_actuators(), |actuator| actuator.constrict(scalar))
   }
 
-  pub fn position_actuators(&self) -> Vec<ButtplugDeviceActuator> {
-    self.get_actuators_by_type(DeviceActuatorType::Position)
+  pub fn position_actuators(&self) -> Vec<&PositionActuator> {
+    self.actuators.iter().filter_map(|actuator| if let Actuator::Position(act) = actuator { Some(act) } else { None }).collect()
   }
 
   pub fn position_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(DeviceActuatorType::Position, |actuator| actuator.position(scalar))
+    self.run_actuator_func(&self.position_actuators(), |actuator| actuator.position(scalar))
   }
 
-  pub fn rotators_with_direction_actuators(&self) -> Vec<ButtplugDeviceActuator> {
-    self.get_actuators_by_type(DeviceActuatorType::RotateWithDirection)
+  pub fn rotators_with_direction_actuators(&self) -> Vec<&RotateWithDirectionActuator> {
+    self.actuators.iter().filter_map(|actuator| if let Actuator::RotateWithDirection(act) = actuator { Some(act) } else { None }).collect()
   }
 
   pub fn rotate_with_direction_all(&self, scalar: f64, clockwise: bool) -> ButtplugClientResultFuture {
-    self.run_actuator_func(DeviceActuatorType::RotateWithDirection, |actuator| actuator.rotate_with_direction(scalar, clockwise))
+    self.run_actuator_func(&self.rotators_with_direction_actuators(), |actuator| actuator.rotate_with_direction(scalar, clockwise))
   }
 
-  pub fn position_with_duration_actuators(&self) -> Vec<ButtplugDeviceActuator> {
-    self.get_actuators_by_type(DeviceActuatorType::RotateWithDirection)
+  pub fn position_with_duration_actuators(&self) -> Vec<&PositionWithDurationActuator> {
+    self.actuators.iter().filter_map(|actuator| if let Actuator::PositionWithDuration(act) = actuator { Some(act) } else { None }).collect()
   }
 
   pub fn position_with_duration_all(&self, position: f64, duration: u32) -> ButtplugClientResultFuture {
-    self.run_actuator_func(DeviceActuatorType::PositionWithDuration, |actuator| actuator.position_with_duration(position, duration))
+    self.run_actuator_func(&self.position_with_duration_actuators(), |actuator| actuator.position_with_duration(position, duration))
   }
 
   fn get_sensor_by_type(&self, sensor_type: &SensorType) -> Vec<ButtplugDeviceSensor> {
