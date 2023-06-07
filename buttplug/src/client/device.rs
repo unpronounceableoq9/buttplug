@@ -9,7 +9,7 @@
 
 use super::{
   create_boxed_future_client_error, device_actuator::{Actuator, VibrateActuator, RotateActuator, OscillateActuator, InflateActuator, ConstrictActuator, PositionActuator, RotateWithDirectionActuator, PositionWithDurationActuator},
-  device_sensor::ButtplugDeviceSensor, ButtplugClientMessageSender, ButtplugClientResultFuture, ButtplugClientError, device_raw::ButtplugDeviceRawEndpoint,
+  device_sensor::Sensor, ButtplugClientMessageSender, ButtplugClientResultFuture, ButtplugClientError, device_raw::ButtplugDeviceRawEndpoint,
 };
 use crate::{
   core::{
@@ -165,7 +165,7 @@ pub struct ButtplugClientDevice {
   // Represents all of the outputs on the device
   actuators: Vec<Actuator>,
   // Represents all of the inputs on the device
-  sensors: Vec<ButtplugDeviceSensor>,
+  sensors: Vec<Sensor>,
   // Represents all endpoints exposed through raw commands
   raw_endpoints: Vec<ButtplugDeviceRawEndpoint>
 }
@@ -214,7 +214,7 @@ impl ButtplugClientDevice {
         message_attributes,
         message_sender,
       ),
-      sensors: ButtplugDeviceSensor::from_sensor_attributes(
+      sensors: Sensor::from_sensor_attributes(
         index,
         message_attributes,
         message_sender,
@@ -287,7 +287,7 @@ impl ButtplugClientDevice {
     &self.actuators
   }
 
-  pub fn sensors(&self) -> &Vec<ButtplugDeviceSensor> {
+  pub fn sensors(&self) -> &Vec<Sensor> {
     &self.sensors
   }
 
@@ -377,39 +377,33 @@ impl ButtplugClientDevice {
     self.run_actuator_func(&self.position_with_duration_actuators(), |actuator| actuator.position_with_duration(position, duration))
   }
 
-  fn get_sensor_by_type(&self, sensor_type: &SensorType) -> Vec<ButtplugDeviceSensor> {
-    self.sensors.iter().filter(|sensor| sensor.sensor_type() == *sensor_type).cloned().collect()
-  }
-
   pub fn has_battery_level(&self) -> bool {
-    !self.get_sensor_by_type(&SensorType::Battery).is_empty()
+    self.sensors.iter().filter_map(|sensor| if let Sensor::Battery(sensor) = sensor { Some(sensor) } else { None }).count() > 0
   }
 
   pub fn battery_level(&self) -> ButtplugClientResultFuture<f64> {
-    let battery_sensor = self.get_sensor_by_type(&SensorType::Battery);
-    if battery_sensor.is_empty() {
+    if let Some(battery) = self.sensors.iter().filter_map(|sensor| if let Sensor::Battery(sensor) = sensor { Some(sensor) } else { None }).nth(0) {
+      battery.battery_level()      
+    } else {
       create_boxed_future_client_error(
         ButtplugDeviceError::UnhandledCommand(format!("Device does not have a battery readout"))
           .into(),
       )
-    } else {
-      battery_sensor[0].battery_level()
     }
   }
 
   pub fn has_rssi_level(&self) -> bool {
-    !self.get_sensor_by_type(&SensorType::RSSI).is_empty()
+    self.sensors.iter().filter_map(|sensor| if let Sensor::Rssi(sensor) = sensor { Some(sensor) } else { None }).count() > 0
   }
 
   pub fn rssi_level(&self) -> ButtplugClientResultFuture<i32> {
-    let rssi_sensor = self.get_sensor_by_type(&SensorType::RSSI);
-    if rssi_sensor.is_empty() {
+    if let Some(rssi) = self.sensors.iter().filter_map(|sensor| if let Sensor::Rssi(sensor) = sensor { Some(sensor) } else { None }).nth(0) {
+      rssi.rssi_level()
+    } else {
       create_boxed_future_client_error(
-        ButtplugDeviceError::UnhandledCommand(format!("Device does not have a RSSI readout"))
+        ButtplugDeviceError::UnhandledCommand(format!("Device does not have a rssi readout"))
           .into(),
       )
-    } else {
-      rssi_sensor[0].rssi_level()
     }
   }
 
