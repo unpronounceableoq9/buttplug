@@ -82,6 +82,10 @@ macro_rules! actuator_struct_impl {
     pub fn descriptor(&self) -> &String {
       self.attributes.feature_descriptor()
     }
+
+    pub fn step_count(&self) -> u32 {
+      *self.attributes.step_count()
+    }
   }
 }
 
