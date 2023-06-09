@@ -288,7 +288,7 @@ impl RawDeviceMessageAttributes {
 }
 
 fn range_sequence_serialize<S>(
-  range_vec: &Vec<RangeInclusive<u32>>,
+  range_vec: &Vec<RangeInclusive<i32>>,
   serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -311,7 +311,7 @@ pub struct SensorDeviceMessageAttributes {
   sensor_type: SensorType,
   #[getset(get = "pub")]
   #[serde(rename = "SensorRange", serialize_with = "range_sequence_serialize")]
-  sensor_range: Vec<RangeInclusive<u32>>,
+  sensor_range: Vec<RangeInclusive<i32>>,
   // TODO This needs to actually be part of the device info relayed to the client in spec v4.
   #[getset(get = "pub")]
   #[serde(skip, default)]
