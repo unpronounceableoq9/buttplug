@@ -14,6 +14,12 @@ pub trait ScalarActuator {
   fn scalar(&self, scalar: f64) -> ButtplugClientResultFuture;
 }
 
+pub trait ActuatorAttributes {  
+  fn descriptor(&self) -> &String;
+  fn step_count(&self) -> u32;
+}
+
+
 #[derive(Clone)]
 pub enum Actuator {
   Unknown(UnknownActuator),
@@ -66,6 +72,16 @@ macro_rules! actuator_struct_declaration {
       attributes: ClientGenericDeviceMessageAttributes,
       message_sender: Arc<ButtplugClientMessageSender>,
     }
+
+    impl ActuatorAttributes for $struct_name {    
+      fn descriptor(&self) -> &String {
+        self.attributes.feature_descriptor()
+      }
+
+      fn step_count(&self) -> u32 {
+        *self.attributes.step_count()
+      }
+    }
   }
 }
 
@@ -77,14 +93,6 @@ macro_rules! actuator_struct_impl {
         attributes: attributes.clone(),
         message_sender: message_sender.clone()
       }
-    }
-    
-    pub fn descriptor(&self) -> &String {
-      self.attributes.feature_descriptor()
-    }
-
-    pub fn step_count(&self) -> u32 {
-      *self.attributes.step_count()
     }
   }
 }

@@ -5,7 +5,7 @@
 // Licensed under the BSD 3-Clause license. See LICENSE file in the project root
 // for full license information.
 
-use std::sync::Arc;
+use std::{sync::Arc, ops::RangeInclusive};
 
 use futures_util::FutureExt;
 
@@ -20,6 +20,12 @@ use crate::core::{
     SensorUnsubscribeCmd,
   },
 };
+
+pub trait SensorAttributes {  
+  fn sensor_type(&self) -> SensorType;
+  fn descriptor(&self) -> &String;
+  fn sensor_range(&self) -> &Vec<RangeInclusive<i32>>;
+}
 
 pub enum Sensor {
   Battery(BatterySensor),
@@ -51,17 +57,17 @@ impl Sensor {
         }
       }
     }
-    if let Some(read_sensors) = attributes.sensor_read_cmd() {
-      for read_sensor in read_sensors {
-        match read_sensor.sensor_type() {
+    if let Some(subscribe_sensors) = attributes.sensor_read_cmd() {
+      for subscribe_sensor in subscribe_sensors {
+        match subscribe_sensor.sensor_type() {
           SensorType::Pressure => {
-
+            sensors.push(Sensor::Pressure(PressureSensor::new(device_index, subscribe_sensor, message_sender)));
           }
           SensorType::Button => {
-
+            sensors.push(Sensor::Button(ButtonSensor::new(device_index, subscribe_sensor, message_sender)));
           }
           _ => {
-
+            sensors.push(Sensor::Unknown(UnknownSensor::new(device_index, subscribe_sensor, message_sender)));
           }
         }
       }
@@ -77,6 +83,20 @@ macro_rules! sensor_struct_declaration {
       device_index: u32,
       attributes: SensorDeviceMessageAttributes,
       message_sender: Arc<ButtplugClientMessageSender>,
+    }
+
+    impl SensorAttributes for $struct_name {
+      fn sensor_type(&self) -> SensorType {
+        *self.attributes.sensor_type()
+      }
+    
+      fn descriptor(&self) -> &String {
+        self.attributes.feature_descriptor()
+      }
+
+      fn sensor_range(&self) -> &Vec<RangeInclusive<i32>> {
+        self.attributes.sensor_range()
+      }
     }
   };
 }
@@ -94,14 +114,6 @@ macro_rules! sensor_struct_impl {
         message_sender: message_sender.clone(),
       };
     }
-  
-    pub fn sensor_type(&self) -> SensorType {
-      *self.attributes.sensor_type()
-    }
-  
-    pub fn descriptor(&self) -> &String {
-      self.attributes.feature_descriptor()
-    }  
   };
 }
 
