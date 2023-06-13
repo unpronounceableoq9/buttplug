@@ -509,13 +509,13 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use device.vibrate_actuators() to access device vibrators."]
+  //#[deprecated = "Method will be removed in next major version. Use device.vibrate_actuators() to access device vibrators."]
   pub fn vibrate_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     self.scalar_value_attributes(&ActuatorType::Vibrate)
   }
 
   /// Commands device to vibrate, assuming it has the features to do so.
-  #[deprecated = "Method will be removed in next major version. Use device.vibrate_all() or [ButtplugDeviceActuator instance].vibrate() to access device vibrators."]
+  //#[deprecated = "Method will be removed in next major version. Use device.vibrate_all() or [ButtplugDeviceActuator instance].vibrate() to access device vibrators."]
   pub fn vibrate(&self, speed_cmd: &ScalarValueCommand) -> ButtplugClientResultFuture {
     #[allow(deprecated)]
     self.scalar_from_value_command(
@@ -525,13 +525,13 @@ impl ButtplugClientDevice {
     )
   }
 
-  #[deprecated = "Method will be removed in next major version. Use device.oscillate_actuators() to access device oscillators."]
+  //#[deprecated = "Method will be removed in next major version. Use device.oscillate_actuators() to access device oscillators."]
   pub fn oscillate_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     self.scalar_value_attributes(&ActuatorType::Oscillate)
   }
 
   /// Commands device to vibrate, assuming it has the features to do so.
-  #[deprecated = "Method will be removed in next major version. Use device.oscillate_all() or [ButtplugDeviceActuator instance].oscillate() to access device oscillators."]
+  //#[deprecated = "Method will be removed in next major version. Use device.oscillate_all() or [ButtplugDeviceActuator instance].oscillate() to access device oscillators."]
   pub fn oscillate(&self, speed_cmd: &ScalarValueCommand) -> ButtplugClientResultFuture {
     #[allow(deprecated)]
     self.scalar_from_value_command(
@@ -541,7 +541,7 @@ impl ButtplugClientDevice {
     )
   }
 
-  #[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
+  //#[deprecated = "Method will be removed in next major version. Use device.actuators() to access device actuators."]
   pub fn scalar(&self, scalar_cmd: &ScalarCommand) -> ButtplugClientResultFuture {
     if self.message_attributes.scalar_cmd().is_none() {
       return create_boxed_future_client_error(
@@ -596,7 +596,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use device.position_with_duration_actuators() instead to access device actuators."]
+  //#[deprecated = "Method will be removed in next major version. Use device.position_with_duration_actuators() instead to access device actuators."]
   pub fn linear_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     if let Some(attrs) = self.message_attributes.linear_cmd() {
       attrs.clone()
@@ -606,7 +606,7 @@ impl ButtplugClientDevice {
   }
 
   /// Commands device to move linearly, assuming it has the features to do so.
-  #[deprecated = "Method will be removed in next major version. Use device.position_with_duration_all() or [ButtplugDeviceActuator instance].position_with_duration() to access device linear movement actuators."]
+  //#[deprecated = "Method will be removed in next major version. Use device.position_with_duration_all() or [ButtplugDeviceActuator instance].position_with_duration() to access device linear movement actuators."]
   pub fn linear(&self, linear_cmd: &LinearCommand) -> ButtplugClientResultFuture {
     if self.message_attributes.linear_cmd().is_none() {
       return create_boxed_future_client_error(
@@ -656,7 +656,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use device.rotation_with_direction_actuators() instead to access device actuators."]
+  //#[deprecated = "Method will be removed in next major version. Use device.rotation_with_direction_actuators() instead to access device actuators."]
   pub fn rotate_attributes(&self) -> Vec<ClientGenericDeviceMessageAttributes> {
     if let Some(attrs) = self.message_attributes.linear_cmd() {
       attrs.clone()
@@ -666,7 +666,7 @@ impl ButtplugClientDevice {
   }
 
   /// Commands device to rotate, assuming it has the features to do so.
-  #[deprecated = "Method will be removed in next major version. Use device.rotation_with_direction_all() or [ButtplugDeviceActuator instance].rotation_wth_direction() to access device rotation actuators."]
+  //#[deprecated = "Method will be removed in next major version. Use device.rotation_with_direction_all() or [ButtplugDeviceActuator instance].rotation_wth_direction() to access device rotation actuators."]
   pub fn rotate(&self, rotate_cmd: &RotateCommand) -> ButtplugClientResultFuture {
     if self.message_attributes.rotate_cmd().is_none() {
       return create_boxed_future_client_error(
@@ -716,7 +716,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceSensor instance].subscribe() to access device sensor subscription."]
+  //#[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceSensor instance].subscribe() to access device sensor subscription."]
   pub fn subscribe_sensor(
     &self,
     sensor_index: u32,
@@ -732,7 +732,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceSensor instance].subscribe() to access device sensor unsubscription."]
+  //#[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceSensor instance].subscribe() to access device sensor unsubscription."]
   pub fn unsubscribe_sensor(
     &self,
     sensor_index: u32,
@@ -748,7 +748,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].write() to access device raw functionality."]
+  //#[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].write() to access device raw functionality."]
   pub fn raw_write(
     &self,
     endpoint: Endpoint,
@@ -769,7 +769,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].read() to access device raw functionality."]
+  //#[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].read() to access device raw functionality."]
   pub fn raw_read(
     &self,
     endpoint: Endpoint,
@@ -804,7 +804,7 @@ impl ButtplugClientDevice {
     .boxed()
   }
 
-  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].subscribe() to access device raw functionality."]
+  //#[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].subscribe() to access device raw functionality."]
   pub fn raw_subscribe(&self, endpoint: Endpoint) -> ButtplugClientResultFuture {
     if self.message_attributes.raw_subscribe_cmd().is_none() {
       return create_boxed_future_client_error(
@@ -816,7 +816,7 @@ impl ButtplugClientDevice {
     self.event_loop_sender.send_message_expect_ok(msg)
   }
 
-  #[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].unsubscribe() to access device raw functionality."]
+  //#[deprecated = "Method will be removed in next major version. Use [ButtplugDeviceRawEndpoint instance].unsubscribe() to access device raw functionality."]
   pub fn raw_unsubscribe(&self, endpoint: Endpoint) -> ButtplugClientResultFuture {
     if self.message_attributes.raw_subscribe_cmd().is_none() {
       return create_boxed_future_client_error(
