@@ -68,6 +68,8 @@ impl Sensor {
         }
       }
     }
+    // Subscription sensors aren't done yet, don't add those for now.
+    /*
     if let Some(subscribe_sensors) = attributes.sensor_read_cmd() {
       for subscribe_sensor in subscribe_sensors {
         match subscribe_sensor.sensor_type() {
@@ -83,6 +85,7 @@ impl Sensor {
         }
       }
     }
+    */
     sensors
   }
 }
