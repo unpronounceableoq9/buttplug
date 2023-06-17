@@ -174,17 +174,15 @@ pub struct ButtplugClientDevice {
 impl ButtplugClientDevice {
   /// Creates a new [ButtplugClientDevice] instance
   ///
-  /// Fills out the struct members for [ButtplugClientDevice].
-  /// `device_connected` and `client_connected` are automatically set to true
-  /// because we assume we're only created connected devices.
+  /// Fills out the struct members for [ButtplugClientDevice]. `device_connected` and
+  /// `client_connected` are automatically set to true because we assume we're only created
+  /// connected devices.
   ///
   /// # Why is this pub(super)?
   ///
-  /// There's really no reason for anyone but a
-  /// [ButtplugClient][super::ButtplugClient] to create a
-  /// [ButtplugClientDevice]. A [ButtplugClientDevice] is mostly a shim around
-  /// the [ButtplugClient] that generated it, with some added convenience
-  /// functions for forming device control messages.
+  /// There's really no reason for anyone but a [ButtplugClient][super::ButtplugClient] to create a
+  /// [ButtplugClientDevice]. A [ButtplugClientDevice] is mostly a shim around the [ButtplugClient]
+  /// that generated it, with some added convenience functions for forming device control messages.
   pub(super) fn new(
     name: &str,
     display_name: &Option<String>,
@@ -240,10 +238,14 @@ impl ButtplugClientDevice {
     )
   }
 
+  /// True if device is currently connected to client. Reconnected devices will be connected as new
+  /// instances, so once this is false it will always be false.
   pub fn connected(&self) -> bool {
     self.device_connected.load(Ordering::SeqCst)
   }
 
+  /// Returns the event stream for the device, which notifies of either client or device
+  /// disconnections.
   pub fn event_stream(&self) -> Box<dyn Stream<Item = ButtplugClientDeviceEvent> + Send + Unpin> {
     Box::new(Box::pin(convert_broadcast_receiver_to_stream(
       self.internal_event_sender.subscribe(),
@@ -283,14 +285,19 @@ impl ButtplugClientDevice {
   //
   // Allows easy access to all actuators/sensors. Per actuator/sensor commands can be accessed by
   // advanced users using accessors.
+  
+  /// Returns all actuators for the device.
   pub fn actuators(&self) -> &Vec<Actuator> {
     &self.actuators
   }
 
+  /// Returns all sensors for the device.
   pub fn sensors(&self) -> &Vec<Sensor> {
     &self.sensors
   }
 
+  /// Returns all raw endpoints for the device, assuming the server is running with Ram Command
+  /// capabilities.
   pub fn raw_endpoints(&self) -> &Vec<ButtplugDeviceRawEndpoint> {
     &self.raw_endpoints
   }
@@ -313,74 +320,125 @@ impl ButtplugClientDevice {
     }
   }
 
+  /// Returns all vibration actuators for a device.
   pub fn vibrate_actuators(&self) -> Vec<&VibrateActuator> {
     self.actuators.iter().filter_map(|actuator| if let Actuator::Vibrate(vibrate) = actuator { Some(vibrate) } else { None }).collect()
   }
 
-  pub fn vibrate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(&self.vibrate_actuators(), |actuator| actuator.vibrate(scalar))
+  /// Set all vibration actuators for a device to a certain speed.
+  pub fn vibrate_all(&self, speed: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(&self.vibrate_actuators(), |actuator| actuator.vibrate(speed))
   }
 
+  /// Returns all single-direction rotation actuators for a device.
   pub fn rotate_actuators(&self) -> Vec<&RotateActuator> {
     self.actuators.iter().filter_map(|actuator| if let Actuator::Rotate(act) = actuator { Some(act) } else { None }).collect()
   }
 
-  pub fn rotate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(&self.rotate_actuators(), |actuator| actuator.rotate(scalar))
+  /// Set all single-direction rotation actuators to a certain speed.
+  pub fn rotate_all(&self, speed: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(&self.rotate_actuators(), |actuator| actuator.rotate(speed))
   }
 
+  /// Returns all oscillating actuators for a device. Oscillating actuators are devices that move
+  /// back and forth between two fixed points, with variable speed. This includes fucking machines,
+  /// strokers (Hismith stroker, position/duration strokers with oscillation actuators, etc...),
+  /// thrusting dildoes, etc...
   pub fn oscillate_actuators(&self) -> Vec<&OscillateActuator> {
-    self.actuators.iter().filter_map(|actuator| if let Actuator::Oscillate(act) = actuator { Some(act) } else { None }).collect()
+    self
+    .actuators
+    .iter()
+    .filter_map(|actuator| if let Actuator::Oscillate(act) = actuator { Some(act) } else { None })
+    .collect()
   }
 
-  pub fn oscillate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(&self.oscillate_actuators(), |actuator| actuator.oscillate(scalar))
+  /// Set all oscillating actuators for a device to a certain speed. Oscillating actuators are
+  /// devices that move back and forth between two fixed points, with variable speed. This actuator
+  /// type includes fucking machines, strokers (Hismith stroker, position/duration strokers with
+  /// oscillation actuators, etc...), thrusting dildoes, etc...
+  pub fn oscillate_all(&self, speed: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(&self.oscillate_actuators(), |actuator| actuator.oscillate(speed))
   }
 
+  /// Returns all constriction actuators for a device. Constriction actuators will set a device to a
+  /// constriction level and hold it there until a new level or stop is received. This actuator type
+  /// includes air bladders in onaholes (like the Lovense Max), servo based squeezing systems, etc...
+  pub fn constrict_actuators(&self) -> Vec<&ConstrictActuator> {
+    self
+    .actuators
+    .iter()
+    .filter_map(|actuator| if let Actuator::Constrict(act) = actuator { Some(act) } else { None })
+    .collect()
+  }
+
+  /// Set all constriction actuators to a certain level and hold at that level until a new level or
+  /// stop is sent.
+  pub fn constrict_all(&self, level: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(&self.constrict_actuators(), |actuator| actuator.constrict(level))
+  }
+
+  /// Returns all inflation actuators for a device. Inflation actuators inflate to a certain level
+  /// and hold.
   pub fn inflate_actuators(&self) -> Vec<&InflateActuator> {
     self.actuators.iter().filter_map(|actuator| if let Actuator::Inflate(act) = actuator { Some(act) } else { None }).collect()
   }
 
-  pub fn inflate_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(&self.inflate_actuators(), |actuator| actuator.inflate(scalar))
+  /// Set all inflation actuators to a certain level and hold at that level until a new level or
+  /// stop is sent.
+  pub fn inflate_all(&self, level: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(&self.inflate_actuators(), |actuator| actuator.inflate(level))
   }
 
-  pub fn constrict_actuators(&self) -> Vec<&ConstrictActuator> {
-    self.actuators.iter().filter_map(|actuator| if let Actuator::Constrict(act) = actuator { Some(act) } else { None }).collect()
-  }
-
-  pub fn constrict_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(&self.constrict_actuators(), |actuator| actuator.constrict(scalar))
-  }
-
+  /// Returns all position actuators for a device. Position actuators are assumed to be servo-like
+  /// systems that move to a position and hold.
   pub fn position_actuators(&self) -> Vec<&PositionActuator> {
     self.actuators.iter().filter_map(|actuator| if let Actuator::Position(act) = actuator { Some(act) } else { None }).collect()
   }
 
-  pub fn position_all(&self, scalar: f64) -> ButtplugClientResultFuture {
-    self.run_actuator_func(&self.position_actuators(), |actuator| actuator.position(scalar))
+  /// Sets position for all position actuators for a device. Position actuators are assumed to be servo-like
+  /// systems that move to a position and hold.
+  pub fn position_all(&self, position: f64) -> ButtplugClientResultFuture {
+    self.run_actuator_func(&self.position_actuators(), |actuator| actuator.position(position))
   }
 
+  /// Returns all actuators that take a rotation speed with a direction. This includes hardware like
+  /// rabbit vibrators with direction control (Lovense Nora), as well as two-way rotational onahole
+  /// devices (Vorze Cyclone series).
   pub fn rotators_with_direction_actuators(&self) -> Vec<&RotateWithDirectionActuator> {
-    self.actuators.iter().filter_map(|actuator| if let Actuator::RotateWithDirection(act) = actuator { Some(act) } else { None }).collect()
+    self
+    .actuators
+    .iter()
+    .filter_map(|actuator| if let Actuator::RotateWithDirection(act) = actuator { Some(act) } else { None })
+    .collect()
   }
 
+  /// Sets the speed of all actuators that take a rotation speed with a direction. This includes
+  /// hardware like rabbit vibrators with direction control (Lovense Nora), as well as two-way
+  /// rotational onahole devices (Vorze Cyclone series).
   pub fn rotate_with_direction_all(&self, scalar: f64, clockwise: bool) -> ButtplugClientResultFuture {
     self.run_actuator_func(&self.rotators_with_direction_actuators(), |actuator| actuator.rotate_with_direction(scalar, clockwise))
   }
 
+  /// Returns all actuators that take a goal position with a duration. This includes hardware like
+  /// strokers (Kiiroo Keon, The Handy, OSR-2/SR-6, etc...), linear actuator driven fucking machines (The
+  /// Shockspot, OSSM, etc...), and other devices.
   pub fn position_with_duration_actuators(&self) -> Vec<&PositionWithDurationActuator> {
     self.actuators.iter().filter_map(|actuator| if let Actuator::PositionWithDuration(act) = actuator { Some(act) } else { None }).collect()
   }
 
+  /// Sets all actuators to goal position with a duration to get to the goal position. This includes
+  /// hardware like strokers (Kiiroo Keon, The Handy, OSR-2/SR-6, etc...), linear actuator driven
+  /// fucking machines (The Shockspot, OSSM, etc...), and other devices.
   pub fn position_with_duration_all(&self, position: f64, duration: u32) -> ButtplugClientResultFuture {
     self.run_actuator_func(&self.position_with_duration_actuators(), |actuator| actuator.position_with_duration(position, duration))
   }
 
+  /// Returns true if a device has the ability to return battery level readings.
   pub fn has_battery_level(&self) -> bool {
     self.sensors.iter().filter_map(|sensor| if let Sensor::Battery(sensor) = sensor { Some(sensor) } else { None }).count() > 0
   }
 
+  /// Returns the battery level of a device. Will error if battery level fetch fails, or if device does not have battery level capabilities.
   pub fn battery_level(&self) -> ButtplugClientResultFuture<f64> {
     if let Some(battery) = self.sensors.iter().filter_map(|sensor| if let Sensor::Battery(sensor) = sensor { Some(sensor) } else { None }).nth(0) {
       battery.battery_level()      
@@ -392,10 +450,12 @@ impl ButtplugClientDevice {
     }
   }
 
+  /// Returns true if a device has the ability to return RSSI level readings.
   pub fn has_rssi_level(&self) -> bool {
     self.sensors.iter().filter_map(|sensor| if let Sensor::Rssi(sensor) = sensor { Some(sensor) } else { None }).count() > 0
   }
 
+  /// Returns the RSSI level of a device. Will error if RSSI level fetch fails, or if device does not have RSSI level capabilities.
   pub fn rssi_level(&self) -> ButtplugClientResultFuture<i32> {
     if let Some(rssi) = self.sensors.iter().filter_map(|sensor| if let Sensor::Rssi(sensor) = sensor { Some(sensor) } else { None }).nth(0) {
       rssi.rssi_level()

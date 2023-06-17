@@ -14,8 +14,13 @@ pub trait ScalarActuator {
   fn scalar(&self, scalar: f64) -> ButtplugClientResultFuture;
 }
 
-pub trait ActuatorAttributes {  
+pub trait ActuatorAttributes {
+  /// Readable description of the actuator. Useful for UI display.
   fn descriptor(&self) -> &String;
+  /// Number of actuation steps the actuator can achieve. The context of this count is per-actuator;
+  /// vibration step count is the levels of vibration speed (for instance, Lovense devices have 20
+  /// levels of vibration speed), position with duration step count is positional granularity
+  /// (Kiiroo Keon has 100 positions), etc...
   fn step_count(&self) -> u32;
 }
 
@@ -116,6 +121,7 @@ macro_rules! scalar_actuator_struct {
     impl $struct_name {
       actuator_struct_impl!();
 
+      /// Runs actuator at the specified speed until another speed update is sent.
       pub fn $actuation_name(&self, speed: f64) -> ButtplugClientResultFuture {
         self.scalar(speed)
       }
