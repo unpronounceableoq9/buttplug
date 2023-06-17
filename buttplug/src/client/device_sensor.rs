@@ -5,25 +5,31 @@
 // Licensed under the BSD 3-Clause license. See LICENSE file in the project root
 // for full license information.
 
-use std::{sync::Arc, ops::RangeInclusive};
+use std::{ops::RangeInclusive, sync::Arc};
 
 use futures_util::{FutureExt, Stream};
 
-use super::{
-  ButtplugClientMessageSender, ButtplugClientResultFuture,
-};
-use crate::{core::{
-  errors::{ButtplugError, ButtplugMessageError},
-  message::{
-    ButtplugCurrentSpecServerMessage, ClientDeviceMessageAttributes,
-    SensorDeviceMessageAttributes, SensorReadCmd, SensorSubscribeCmd, SensorType,
-    SensorUnsubscribeCmd, SensorReading
+use super::{ButtplugClientMessageSender, ButtplugClientResultFuture};
+use crate::{
+  core::{
+    errors::{ButtplugError, ButtplugMessageError},
+    message::{
+      ButtplugCurrentSpecServerMessage,
+      ClientDeviceMessageAttributes,
+      SensorDeviceMessageAttributes,
+      SensorReadCmd,
+      SensorReading,
+      SensorSubscribeCmd,
+      SensorType,
+      SensorUnsubscribeCmd,
+    },
   },
-}, util::stream::convert_broadcast_receiver_to_stream};
+  util::stream::convert_broadcast_receiver_to_stream,
+};
 use async_stream::stream;
 use tokio::sync::broadcast;
 
-pub trait SensorAttributes {  
+pub trait SensorAttributes {
   fn sensor_type(&self) -> SensorType;
   fn descriptor(&self) -> &String;
   fn sensor_range(&self) -> &Vec<RangeInclusive<i32>>;
@@ -57,13 +63,25 @@ impl Sensor {
       for read_sensor in read_sensors {
         match read_sensor.sensor_type() {
           SensorType::Battery => {
-            sensors.push(Sensor::Battery(BatterySensor::new(device_index, read_sensor, message_sender)));
+            sensors.push(Sensor::Battery(BatterySensor::new(
+              device_index,
+              read_sensor,
+              message_sender,
+            )));
           }
           SensorType::RSSI => {
-            sensors.push(Sensor::Rssi(RssiSensor::new(device_index, read_sensor, message_sender)));
+            sensors.push(Sensor::Rssi(RssiSensor::new(
+              device_index,
+              read_sensor,
+              message_sender,
+            )));
           }
           _ => {
-            sensors.push(Sensor::Unknown(UnknownSensor::new(device_index, read_sensor, message_sender)));
+            sensors.push(Sensor::Unknown(UnknownSensor::new(
+              device_index,
+              read_sensor,
+              message_sender,
+            )));
           }
         }
       }
@@ -108,7 +126,7 @@ macro_rules! sensor_struct_declaration {
       fn sensor_type(&self) -> SensorType {
         *self.attributes.sensor_type()
       }
-    
+
       fn descriptor(&self) -> &String {
         self.attributes.feature_descriptor()
       }
@@ -132,7 +150,7 @@ macro_rules! sensor_struct_impl {
         device_index,
         attributes: attributes.clone(),
         message_sender: message_sender.clone(),
-        internal_event_sender: sender
+        internal_event_sender: sender,
       };
     }
   };
@@ -170,17 +188,23 @@ macro_rules! sensor_read_impl {
 macro_rules! sensor_subscribe_impl {
   ($struct_name:ident) => {
     impl SubscribableSensor for $struct_name {
-      fn subscribe(
-        &self
-      ) -> ButtplugClientResultFuture {
-        let msg = SensorSubscribeCmd::new(self.device_index, *self.attributes.index(), *self.attributes.sensor_type()).into();
+      fn subscribe(&self) -> ButtplugClientResultFuture {
+        let msg = SensorSubscribeCmd::new(
+          self.device_index,
+          *self.attributes.index(),
+          *self.attributes.sensor_type(),
+        )
+        .into();
         self.message_sender.send_message_expect_ok(msg)
       }
-    
-      fn unsubscribe(
-        &self
-      ) -> ButtplugClientResultFuture {
-        let msg = SensorUnsubscribeCmd::new(self.device_index, *self.attributes.index(), *self.attributes.sensor_type()).into();
+
+      fn unsubscribe(&self) -> ButtplugClientResultFuture {
+        let msg = SensorUnsubscribeCmd::new(
+          self.device_index,
+          *self.attributes.index(),
+          *self.attributes.sensor_type(),
+        )
+        .into();
         self.message_sender.send_message_expect_ok(msg)
       }
     }
@@ -216,14 +240,12 @@ impl RssiSensor {
   }
 }
 
-
 pub fn convert_single_value_sensor_broadcast_receiver_to_stream(
   receiver: broadcast::Receiver<SensorReading>,
-) -> impl Stream<Item = i32>
-{
+) -> impl Stream<Item = i32> {
   stream! {
     pin_mut!(receiver);
-    while let Ok(val) = receiver.recv().await {      
+    while let Ok(val) = receiver.recv().await {
       yield val.data()[0];
     }
   }
@@ -236,9 +258,11 @@ impl PressureSensor {
   sensor_struct_impl!();
 
   pub fn event_stream(&self) -> Box<dyn Stream<Item = i32> + Send + Unpin> {
-    Box::new(Box::pin(convert_single_value_sensor_broadcast_receiver_to_stream(
-      self.internal_event_sender.subscribe(),
-    )))
+    Box::new(Box::pin(
+      convert_single_value_sensor_broadcast_receiver_to_stream(
+        self.internal_event_sender.subscribe(),
+      ),
+    ))
   }
 }
 
@@ -248,9 +272,11 @@ sensor_subscribe_impl!(ButtonSensor);
 impl ButtonSensor {
   sensor_struct_impl!();
   pub fn event_stream(&self) -> Box<dyn Stream<Item = i32> + Send + Unpin> {
-    Box::new(Box::pin(convert_single_value_sensor_broadcast_receiver_to_stream(
-      self.internal_event_sender.subscribe(),
-    )))
+    Box::new(Box::pin(
+      convert_single_value_sensor_broadcast_receiver_to_stream(
+        self.internal_event_sender.subscribe(),
+      ),
+    ))
   }
 }
 
