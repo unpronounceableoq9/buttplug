@@ -150,10 +150,7 @@ fn test_client_device_invalid_command() {
     }
     let test_device = client_device.expect("Test, assuming infallible.");
     assert!(matches!(
-      test_device
-        .vibrate_all(2.0)
-        .await
-        .unwrap_err(),
+      test_device.vibrate_all(2.0).await.unwrap_err(),
       ButtplugClientError::ButtplugError(ButtplugError::ButtplugMessageError(
         ButtplugMessageError::InvalidMessageContents(..)
       ))

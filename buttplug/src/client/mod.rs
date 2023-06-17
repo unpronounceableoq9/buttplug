@@ -10,8 +10,8 @@ pub mod client_event_loop;
 pub mod client_message_sorter;
 pub mod device;
 pub mod device_actuator;
-pub mod device_sensor;
 pub mod device_raw;
+pub mod device_sensor;
 
 use crate::{
   core::{
@@ -151,7 +151,9 @@ pub enum ButtplugClientEvent {
 impl Unpin for ButtplugClientEvent {
 }
 
-pub(super) fn create_boxed_future_client_error<T>(err: ButtplugError) -> ButtplugClientResultFuture<T>
+pub(super) fn create_boxed_future_client_error<T>(
+  err: ButtplugError,
+) -> ButtplugClientResultFuture<T>
 where
   T: 'static + Send + Sync,
 {
@@ -164,13 +166,16 @@ pub(super) struct ButtplugClientMessageSender {
 }
 
 impl ButtplugClientMessageSender {
-  fn new(message_sender: &broadcast::Sender<ButtplugClientRequest>, connected: &Arc<AtomicBool>) -> Self {
+  fn new(
+    message_sender: &broadcast::Sender<ButtplugClientRequest>,
+    connected: &Arc<AtomicBool>,
+  ) -> Self {
     Self {
       message_sender: message_sender.clone(),
-      connected: connected.clone()
+      connected: connected.clone(),
     }
   }
-  
+
   /// Send message to the internal event loop.
   ///
   /// Mostly for handling boilerplate around possible send errors.
@@ -193,7 +198,7 @@ impl ButtplugClientMessageSender {
     }
     .boxed()
   }
-  
+
   pub fn subscribe(&self) -> broadcast::Receiver<ButtplugClientRequest> {
     self.message_sender.subscribe()
   }
@@ -280,7 +285,10 @@ impl ButtplugClient {
       client_name: name.to_owned(),
       server_name: Arc::new(Mutex::new(None)),
       event_stream,
-      message_sender: Arc::new(ButtplugClientMessageSender::new(&message_sender, &connected)),
+      message_sender: Arc::new(ButtplugClientMessageSender::new(
+        &message_sender,
+        &connected,
+      )),
       connected,
       device_map: Arc::new(DashMap::new()),
     }
@@ -409,7 +417,9 @@ impl ButtplugClient {
   /// Returns Err([ButtplugClientError]) if request fails due to issues with
   /// DeviceManagers on the server, disconnection, etc.
   pub fn start_scanning(&self) -> ButtplugClientResultFuture {
-    self.message_sender.send_message_expect_ok(StartScanning::default().into())
+    self
+      .message_sender
+      .send_message_expect_ok(StartScanning::default().into())
   }
 
   /// Tells server to stop scanning for devices.
@@ -417,7 +427,9 @@ impl ButtplugClient {
   /// Returns Err([ButtplugClientError]) if request fails due to issues with
   /// DeviceManagers on the server, disconnection, etc.
   pub fn stop_scanning(&self) -> ButtplugClientResultFuture {
-    self.message_sender.send_message_expect_ok(StopScanning::default().into())
+    self
+      .message_sender
+      .send_message_expect_ok(StopScanning::default().into())
   }
 
   /// Tells server to stop all devices.
@@ -425,7 +437,9 @@ impl ButtplugClient {
   /// Returns Err([ButtplugClientError]) if request fails due to issues with
   /// DeviceManagers on the server, disconnection, etc.
   pub fn stop_all_devices(&self) -> ButtplugClientResultFuture {
-    self.message_sender.send_message_expect_ok(StopAllDevices::default().into())
+    self
+      .message_sender
+      .send_message_expect_ok(StopAllDevices::default().into())
   }
 
   pub fn event_stream(&self) -> impl Stream<Item = ButtplugClientEvent> {
@@ -448,7 +462,9 @@ impl ButtplugClient {
   }
 
   pub fn ping(&self) -> ButtplugClientResultFuture {
-    let ping_fut = self.message_sender.send_message_expect_ok(Ping::default().into());
+    let ping_fut = self
+      .message_sender
+      .send_message_expect_ok(Ping::default().into());
     async move { ping_fut.await }.boxed()
   }
 
