@@ -88,7 +88,7 @@ pub enum ButtplugClientDeviceEvent {
 ///
 /// Allows users to easily specify speeds across different vibration features in
 /// a device. Units are in absolute speed values (0.0-1.0).
-#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
+//#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
 pub enum ScalarCommand {
   /// Sets all vibration features of a device to the same speed.
   Scalar((f64, ActuatorType)),
@@ -106,7 +106,7 @@ pub enum ScalarCommand {
 ///
 /// Allows users to easily specify speeds across different vibration features in
 /// a device. Units are in absolute speed values (0.0-1.0).
-#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
+//#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
 pub enum ScalarValueCommand {
   /// Sets all vibration features of a device to the same speed.
   ScalarValue(f64),
@@ -125,7 +125,7 @@ pub enum ScalarValueCommand {
 /// Allows users to easily specify speeds/directions across different rotation
 /// features in a device. Units are in absolute speed (0.0-1.0), and clockwise
 /// direction (clockwise if true, counterclockwise if false)
-#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
+//#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
 pub enum RotateCommand {
   /// Sets all rotation features of a device to the same speed/direction.
   Rotate(f64, bool),
@@ -144,7 +144,7 @@ pub enum RotateCommand {
 /// Allows users to easily specify position/durations across different rotation
 /// features in a device. Units are in absolute position (0.0-1.0) and
 /// millliseconds of movement duration.
-#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
+//#[deprecated = "Type will be removed in next major version. Use device.actuators() to access device actuators."]
 pub enum LinearCommand {
   /// Sets all linear features of a device to the same position/duration.
   Linear(u32, f64),
