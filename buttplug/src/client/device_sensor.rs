@@ -24,7 +24,6 @@ use crate::{
       SensorUnsubscribeCmd,
     },
   },
-  util::stream::convert_broadcast_receiver_to_stream,
 };
 use async_stream::stream;
 use tokio::sync::broadcast;

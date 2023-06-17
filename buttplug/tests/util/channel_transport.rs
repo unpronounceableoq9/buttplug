@@ -136,7 +136,7 @@ impl ChannelClientTestHelper {
       outgoing_sender,
     )))));
     let client_serializer = ButtplugClientJSONSerializer::default();
-    let rsi_setup_msg = client_serializer.serialize(&vec![message::RequestServerInfo::new(
+    let rsi_setup_msg = client_serializer.serialize(&[message::RequestServerInfo::new(
       "Test client",
       BUTTPLUG_CURRENT_MESSAGE_SPEC_VERSION,
     )
@@ -254,7 +254,7 @@ impl ChannelClientTestHelper {
   pub async fn send_server_incoming(&self, msg: ButtplugCurrentSpecClientMessage) {
     self
       .send_incoming(ButtplugTransportIncomingMessage::Message(
-        self.client_serializer.serialize(&vec![msg]),
+        self.client_serializer.serialize(&[msg]),
       ))
       .await;
   }
@@ -328,7 +328,7 @@ impl ChannelServerTestHelper {
   pub async fn send_server_incoming(&self, msg: ButtplugCurrentSpecClientMessage) {
     self
       .send_incoming(ButtplugTransportIncomingMessage::Message(
-        self.client_serializer.serialize(&vec![msg]),
+        self.client_serializer.serialize(&[msg]),
       ))
       .await;
   }
