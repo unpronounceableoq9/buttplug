@@ -5,15 +5,119 @@
 // Licensed under the BSD 3-Clause license. See LICENSE file in the project root
 // for full license information.
 
+use std::ops::RangeInclusive;
+
 use super::*;
 use getset::{CopyGetters, Getters, MutGetters};
 #[cfg(feature = "serialize-json")]
-use serde::{Deserialize, Serialize};
+use serde::{ser::SerializeSeq, Deserialize, Serialize, Serializer};
+
+/// Substructure of device messages, used for actuator information (name, messages supported, etc...)
+#[derive(Clone, Debug, PartialEq, Eq, MutGetters, Getters, CopyGetters)]
+#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
+pub struct ActuatorInfo {
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Index"))]
+  #[getset(get_copy = "pub")]
+  index: u32,
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Descriptor"))]
+  #[getset(get = "pub")]
+  descriptor: String,
+  #[getset(get = "pub")]
+  #[serde(rename = "ActuatorType")]
+  actuator_type: ActuatorType,
+  #[serde(rename = "StepCount")]
+  #[getset(get = "pub")]
+  step_count: u32,  
+}
+
+
+fn range_sequence_serialize<S>(
+  range_vec: &Vec<RangeInclusive<i32>>,
+  serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+  S: Serializer,
+{
+  let mut seq = serializer.serialize_seq(Some(range_vec.len()))?;
+  for range in range_vec {
+    seq.serialize_element(&vec![*range.start(), *range.end()])?;
+  }
+  seq.end()
+}
+
+/// Substructure of device messages, used for sensor information (name, messages supported, etc...)
+#[derive(Clone, Debug, PartialEq, Eq, MutGetters, Getters, CopyGetters)]
+#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
+pub struct SensorInfo {
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Index"))]
+  #[getset(get_copy = "pub")]
+  index: u32,
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Descriptor"))]
+  #[getset(get = "pub")]
+  descriptor: String,
+  #[getset(get = "pub")]
+  #[serde(rename = "SensorType")]
+  sensor_type: SensorType,
+  #[getset(get = "pub")]
+  #[serde(rename = "SensorRange", serialize_with = "range_sequence_serialize")]
+  sensor_range: Vec<RangeInclusive<i32>>,
+  #[getset(get = "pub")]
+  #[serde(rename = "Readable")]
+  readable: bool,
+  #[getset(get = "pub")]
+  #[serde(rename = "Subscribable")]
+  subscribable: bool
+}
 
 /// Substructure of device messages, used for attribute information (name, messages supported, etc...)
 #[derive(Clone, Debug, PartialEq, Eq, MutGetters, Getters, CopyGetters)]
 #[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
 pub struct DeviceMessageInfo {
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Index"))]
+  #[getset(get_copy = "pub")]
+  index: u32,
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Name"))]
+  #[getset(get = "pub")]
+  name: String,
+  #[cfg_attr(
+    feature = "serialize-json",
+    serde(rename = "DisplayName", skip_serializing_if = "Option::is_none")
+  )]
+  #[getset(get = "pub")]
+  display_name: Option<String>,
+  #[cfg_attr(
+    feature = "serialize-json",
+    serde(
+      rename = "MessageTimingGap",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  #[getset(get = "pub")]
+  message_timing_gap: Option<u32>,
+  #[cfg_attr(
+    feature = "serialize-json",
+    serde(
+      rename = "Actuators",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  #[getset(get = "pub")]
+  actuators: Option<Vec<ActuatorInfo>>,
+  #[cfg_attr(
+    feature = "serialize-json",
+    serde(
+      rename = "Sensors",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  #[getset(get = "pub")]
+  sensors: Option<Vec<SensorInfo>>,
+}
+
+/// Substructure of device messages, used for attribute information (name, messages supported, etc...)
+#[derive(Clone, Debug, PartialEq, Eq, MutGetters, Getters, CopyGetters)]
+#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
+pub struct DeviceMessageInfoV3 {
   #[cfg_attr(feature = "serialize-json", serde(rename = "DeviceIndex"))]
   #[getset(get_copy = "pub")]
   device_index: u32,
@@ -40,7 +144,7 @@ pub struct DeviceMessageInfo {
   device_messages: ClientDeviceMessageAttributes,
 }
 
-impl DeviceMessageInfo {
+impl DeviceMessageInfoV3 {
   pub fn new(
     device_index: u32,
     device_name: &str,
@@ -58,8 +162,8 @@ impl DeviceMessageInfo {
   }
 }
 
-impl From<DeviceAdded> for DeviceMessageInfo {
-  fn from(device_added: DeviceAdded) -> Self {
+impl From<DeviceAddedV3> for DeviceMessageInfoV3 {
+  fn from(device_added: DeviceAddedV3) -> Self {
     Self {
       device_index: device_added.device_index(),
       device_name: device_added.device_name().clone(),
@@ -84,9 +188,9 @@ pub struct DeviceMessageInfoV2 {
   device_messages: ClientDeviceMessageAttributesV2,
 }
 
-impl From<DeviceAdded> for DeviceMessageInfoV2 {
-  fn from(device_added: DeviceAdded) -> Self {
-    let dmi = DeviceMessageInfo::from(device_added);
+impl From<DeviceAddedV3> for DeviceMessageInfoV2 {
+  fn from(device_added: DeviceAddedV3) -> Self {
+    let dmi = DeviceMessageInfoV3::from(device_added);
     DeviceMessageInfoV2::from(dmi)
   }
 }
@@ -102,8 +206,8 @@ impl From<DeviceAddedV2> for DeviceMessageInfoV2 {
   }
 }
 
-impl From<DeviceMessageInfo> for DeviceMessageInfoV2 {
-  fn from(device_message_info: DeviceMessageInfo) -> Self {
+impl From<DeviceMessageInfoV3> for DeviceMessageInfoV2 {
+  fn from(device_message_info: DeviceMessageInfoV3) -> Self {
     // No structural difference, it's all content changes
     Self {
       device_index: device_message_info.device_index,
@@ -127,8 +231,8 @@ pub struct DeviceMessageInfoV1 {
   device_messages: ClientDeviceMessageAttributesV1,
 }
 
-impl From<DeviceAdded> for DeviceMessageInfoV1 {
-  fn from(device_added: DeviceAdded) -> Self {
+impl From<DeviceAddedV3> for DeviceMessageInfoV1 {
+  fn from(device_added: DeviceAddedV3) -> Self {
     let dmi = DeviceMessageInfoV2::from(device_added);
     DeviceMessageInfoV1::from(dmi)
   }
@@ -159,9 +263,9 @@ pub struct DeviceMessageInfoV0 {
   device_messages: Vec<ButtplugDeviceMessageType>,
 }
 
-impl From<DeviceAdded> for DeviceMessageInfoV0 {
-  fn from(device_added: DeviceAdded) -> Self {
-    let dmi = DeviceMessageInfo::from(device_added);
+impl From<DeviceAddedV3> for DeviceMessageInfoV0 {
+  fn from(device_added: DeviceAddedV3) -> Self {
+    let dmi = DeviceMessageInfoV3::from(device_added);
     let dmi_v2: DeviceMessageInfoV2 = dmi.into();
     let dmi_v1: DeviceMessageInfoV1 = dmi_v2.into();
     dmi_v1.into()

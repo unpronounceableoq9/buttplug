@@ -92,8 +92,8 @@
 # - Serial info here is for default device configuration. Port names will have to be added by the
 #   user in the user device config file.
 version:
-  major: 2
-  minor: 14
+  major: 3
+  minor: 0
 protocols:
   lovense:
     # Lovense is special. Special in oh so many ways.
@@ -195,14 +195,17 @@ protocols:
           rx: 45460003-0023-4bd4-bbd5-a6920e4c5653
     defaults:
       name: Lovense Device
-      messages:
-        ScalarCmd:
-          - StepRange: [0, 20]
-            ActuatorType: Vibrate
-        SensorReadCmd:
-          - FeatureDescriptor: Battery Level
-            SensorType: Battery
-            SensorRange: [[0, 100]]
+      actuators:
+        - StepRange: [0, 20]
+          Type: Vibrate
+          Messages: ScalarCmd
+          Descriptor: Generic Vibrator
+      sensors:
+        - StepRange: [[0, 100]]
+          Type: Battery
+          Descriptor: Battery Level
+          Readable: true
+          Subscribable: false
     configurations:
       # For lovense, our identifiers are the letters returned from the
       # DeviceInfo query sent on initialization.

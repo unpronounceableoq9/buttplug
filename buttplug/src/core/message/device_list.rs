@@ -5,7 +5,7 @@
 // Licensed under the BSD 3-Clause license. See LICENSE file in the project root
 // for full license information.
 
-use super::device_message_info::{DeviceMessageInfoV0, DeviceMessageInfoV1, DeviceMessageInfoV2};
+use super::device_message_info::{DeviceMessageInfoV0, DeviceMessageInfoV1, DeviceMessageInfoV2, DeviceMessageInfoV3, DeviceMessageInfo};
 use super::*;
 use getset::Getters;
 #[cfg(feature = "serialize-json")]
@@ -35,6 +35,35 @@ impl ButtplugMessageValidator for DeviceList {
 }
 
 impl ButtplugMessageFinalizer for DeviceList {
+  fn finalize(&mut self) {
+  }
+}
+
+
+/// List of all devices currently connected to the server.
+#[derive(Default, Clone, Debug, PartialEq, Eq, ButtplugMessage, Getters)]
+#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
+pub struct DeviceListV3 {
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Id"))]
+  id: u32,
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Devices"))]
+  #[getset(get = "pub")]
+  devices: Vec<DeviceMessageInfoV3>,
+}
+
+impl DeviceListV3 {
+  pub fn new(devices: Vec<DeviceMessageInfoV3>) -> Self {
+    Self { id: 1, devices }
+  }
+}
+
+impl ButtplugMessageValidator for DeviceListV3 {
+  fn is_valid(&self) -> Result<(), ButtplugMessageError> {
+    self.is_not_system_id(self.id)
+  }
+}
+
+impl ButtplugMessageFinalizer for DeviceListV3 {
   fn finalize(&mut self) {
     for device in &mut self.devices {
       device.device_messages_mut().finalize();

@@ -73,13 +73,13 @@ pub use client_device_message_attributes::{
   SensorDeviceMessageAttributes,
   SensorType,
 };
-pub use device_added::{DeviceAdded, DeviceAddedV0, DeviceAddedV1, DeviceAddedV2};
-pub use device_list::{DeviceList, DeviceListV0, DeviceListV1, DeviceListV2};
+pub use device_added::{DeviceAdded, DeviceAddedV0, DeviceAddedV1, DeviceAddedV2, DeviceAddedV3};
+pub use device_list::{DeviceList, DeviceListV0, DeviceListV1, DeviceListV2, DeviceListV3};
 pub use device_message_info::{
-  DeviceMessageInfo,
   DeviceMessageInfoV0,
   DeviceMessageInfoV1,
   DeviceMessageInfoV2,
+  DeviceMessageInfoV3,
 };
 pub use device_removed::DeviceRemoved;
 pub use endpoint::Endpoint;
@@ -389,6 +389,83 @@ pub type ButtplugCurrentSpecServerMessage = ButtplugSpecV3ServerMessage;
   TryFromButtplugClientMessage,
 )]
 #[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
+pub enum ButtplugSpecV4ClientMessage {
+  // Handshake messages
+  RequestServerInfo(RequestServerInfo),
+  Ping(Ping),
+  // Device enumeration messages
+  StartScanning(StartScanning),
+  StopScanning(StopScanning),
+  RequestDeviceList(RequestDeviceList),
+  // Generic commands
+  StopAllDevices(StopAllDevices),
+  VibrateCmd(VibrateCmd),
+  LinearCmd(LinearCmd),
+  RotateCmd(RotateCmd),
+  RawWriteCmd(RawWriteCmd),
+  RawReadCmd(RawReadCmd),
+  StopDeviceCmd(StopDeviceCmd),
+  RawSubscribeCmd(RawSubscribeCmd),
+  RawUnsubscribeCmd(RawUnsubscribeCmd),
+  ScalarCmd(ScalarCmd),
+  // Sensor commands
+  SensorReadCmd(SensorReadCmd),
+  SensorSubscribeCmd(SensorSubscribeCmd),
+  SensorUnsubscribeCmd(SensorUnsubscribeCmd),
+}
+
+/// Represents all server-to-client messages in v3 of the Buttplug Spec
+#[derive(
+  Debug,
+  Clone,
+  PartialEq,
+  ButtplugMessage,
+  ButtplugMessageValidator,
+  ButtplugServerMessageType,
+  FromSpecificButtplugMessage,
+  TryFromButtplugServerMessage,
+)]
+#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
+pub enum ButtplugSpecV4ServerMessage {
+  // Status messages
+  Ok(Ok),
+  Error(Error),
+  // Handshake messages
+  ServerInfo(ServerInfo),
+  // Device enumeration messages
+  DeviceList(DeviceList),
+  DeviceAdded(DeviceAdded),
+  DeviceRemoved(DeviceRemoved),
+  ScanningFinished(ScanningFinished),
+  // Generic commands
+  RawReading(RawReading),
+  // Sensor commands
+  SensorReading(SensorReading),
+}
+
+impl ButtplugMessageFinalizer for ButtplugSpecV4ServerMessage {
+  fn finalize(&mut self) {
+    match self {
+      ButtplugSpecV4ServerMessage::DeviceAdded(da) => da.finalize(),
+      ButtplugSpecV4ServerMessage::DeviceList(dl) => dl.finalize(),
+      _ => return,
+    }
+  }
+}
+
+/// Represents all client-to-server messages in v3 of the Buttplug Spec
+#[derive(
+  Debug,
+  Clone,
+  PartialEq,
+  ButtplugMessage,
+  ButtplugMessageValidator,
+  ButtplugClientMessageType,
+  ButtplugMessageFinalizer,
+  FromSpecificButtplugMessage,
+  TryFromButtplugClientMessage,
+)]
+#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
 pub enum ButtplugSpecV3ClientMessage {
   // Handshake messages
   RequestServerInfo(RequestServerInfo),
@@ -433,8 +510,8 @@ pub enum ButtplugSpecV3ServerMessage {
   // Handshake messages
   ServerInfo(ServerInfo),
   // Device enumeration messages
-  DeviceList(DeviceList),
-  DeviceAdded(DeviceAdded),
+  DeviceList(DeviceListV3),
+  DeviceAdded(DeviceAddedV3),
   DeviceRemoved(DeviceRemoved),
   ScanningFinished(ScanningFinished),
   // Generic commands
