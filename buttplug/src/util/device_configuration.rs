@@ -26,7 +26,6 @@ use crate::{
       XInputSpecifier,
     },
     ServerDeviceIdentifier,
-    ServerDeviceManagerBuilder,
   },
 };
 use getset::{CopyGetters, Getters, MutGetters, Setters};
