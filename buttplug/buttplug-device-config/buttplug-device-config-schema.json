@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Buttplug Device Config Schema",
-  "version": 2,
+  "version": 3,
   "description": "JSON format for Buttplug Device Config Files.",
   "components": {
     "uuid": {
@@ -162,11 +162,6 @@
       },
       "minItems": 1
     },
-    "FeatureCount": {
-      "description": "Number of features on device.",
-      "type": "integer",
-      "minimum": 1
-    },
     "StepRange": {
       "description": "Specifies the range of steps to use for a device. Devices will use the low end value as a stop.",
       "type": "array",
@@ -176,141 +171,80 @@
       "minItems": 2,
       "maxItems": 2
     },
-    "FeatureOrder": {
-      "description": "Specifies the order features are exposed in by the ButtplugMessages.",
-      "minimum": 0,
-      "type": "integer"
-    },
-    "NullMessageAttributes": {
-      "description": "Attributes for device message that have no attributes.",
+    "ActuatorAttributes": {
+      "description": "Attributes for actuators.",
       "type": "object",
-      "additionalProperties": false,
-      "minProperties": 0,
-      "maxProperties": 0
-    },
-    "GenericMessageAttributes": {
-      "description": "Attributes for device messages.",
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "StepRange": {
-            "$ref": "#/components/StepRange"
-          },
-          "FeatureOrder": {
-            "$ref": "#/components/FeatureOrder"
-          },
-          "FeatureDescriptor": {
-            "type": "string"
-          },
-          "ActuatorType": {
-            "type": "string",
-            "pattern": "^(Vibrate|Rotate|Oscillate|Constrict|Inflate|Position)$"
-          }
-        },
-        "required": [
-          "StepRange",
-          "ActuatorType"
-        ],
-        "additionalProperties": false,
-        "minProperties": 0
-      },
-      "minItems": 1
-    },
-    "SensorMessageAttributes": {
-      "description": "Attributes for sensor messages.",
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "SensorType": {
-            "type": "string"
-          },
-          "FeatureDescriptor": {
-            "type": "string"
-          },
-          "SensorRange": {
-            "type": "array",
-            "items": {
+      "patternProperties": {
+        "^([0-9]+)$": { 
+          "type": "object",
+          "properties": {
+            "StepRange": {
               "$ref": "#/components/StepRange"
             },
-            "minItems": 1
-          }
-        },
-        "required": [
-          "SensorType",
-          "FeatureDescriptor",
-          "SensorRange"
-        ],
-        "additionalProperties": false,
-        "minProperties": 0
-      },
-      "minItems": 1
-    },
-    "DeviceMessagesEx": {
-      "description": "A list of the messages a device will accept on this server implementation.",
-      "type": "object",
-      "properties": {
-        "StopDeviceCmd": {
-          "$ref": "#/components/NullMessageAttributes"
-        },
-        "ScalarCmd": {
-          "$ref": "#/components/GenericMessageAttributes"
-        },
-        "VibrateCmd": {
-          "$ref": "#/components/GenericMessageAttributes"
-        },
-        "LinearCmd": {
-          "$ref": "#/components/GenericMessageAttributes"
-        },
-        "RotateCmd": {
-          "$ref": "#/components/GenericMessageAttributes"
-        },
-        "SensorReadCmd": {
-          "$ref": "#/components/SensorMessageAttributes"
-        },
-        "SensorSubscribeCmd": {
-          "$ref": "#/components/SensorMessageAttributes"
-        },
-        "SensorUnsubscribeCmd": {
-          "$ref": "#/components/SensorMessageAttributes"
-        },
-        "LovenseCmd": {
-          "$ref": "#/components/NullMessageAttributes"
-        },
-        "VorzeA10CycloneCmd": {
-          "$ref": "#/components/NullMessageAttributes"
-        },
-        "KiirooCmd": {
-          "$ref": "#/components/NullMessageAttributes"
-        },
-        "SingleMotorVibrateCmd": {
-          "$ref": "#/components/NullMessageAttributes"
-        },
-        "FleshlightLaunchFW12Cmd": {
-          "$ref": "#/components/NullMessageAttributes"
+            "Descriptor": {
+              "type": "string"
+            },
+            "Type": {
+              "type": "string",
+              "pattern": "^(Vibrate|Rotate|Oscillate|Constrict|Inflate|Position|RotationWithDirection|PositionWithDuration)$"
+            },
+            "Messages": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(ScalarCmd|RotateCmd|LinearCmd)$"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "StepRange",
+            "Type",
+            "Messages"
+          ],
+          "additionalProperties": false,
+          "minProperties": 0
         }
-      },
-      "additionalProperties": false
+      }
     },
-    "UserDeviceMessagesEx": {
-      "description": "A list of the messages that can be configured in user device settings.",
+    "SensorAttributes": {
+      "description": "Attributes for sensors.",
       "type": "object",
-      "properties": {
-        "ScalarCmd": {
-          "$ref": "#/components/GenericMessageAttributes"
-        },
-        "VibrateCmd": {
-          "$ref": "#/components/GenericMessageAttributes"
-        },
-        "LinearCmd": {
-          "$ref": "#/components/GenericMessageAttributes"
-        },
-        "RotateCmd": {
-          "$ref": "#/components/GenericMessageAttributes"
+      "patternProperties": {
+        "^([0-9]+)$": { 
+          "type": "object",      
+          "properties": {
+            "Type": {
+              "type": "string"
+            },
+            "Descriptor": {
+              "type": "string"
+            },
+            "SensorRange": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/StepRange"
+              },
+              "minItems": 1
+            },
+            "Readable": {
+              "type": "boolean"
+            },
+            "Subscribable": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "Type",
+            "Descriptor",
+            "SensorRange",
+            "Readable",
+            "Subscribable"
+          ],
+          "additionalProperties": false,
+          "minProperties": 0
         }
-      },
-      "additionalProperties": false
+      }
     },
     "user-config": {
       "type": "object",
@@ -327,8 +261,11 @@
         "index": {
           "type": "integer"
         },
-        "messages": {
-          "$ref": "#/components/UserDeviceMessagesEx"
+        "actuators": {
+          "$ref": "#/components/ActuatorAttributes"
+        },
+        "sensors": {
+          "$ref": "#/components/SensorAttributes"
         }
       },
       "additionalProperties": false
@@ -339,13 +276,15 @@
         "name": {
           "type": "string"
         },
-        "messages": {
-          "$ref": "#/components/DeviceMessagesEx"
+        "actuators": {
+          "$ref": "#/components/ActuatorAttributes"
+        },
+        "sensors": {
+          "$ref": "#/components/SensorAttributes"
         }
       },
       "required": [
-        "name",
-        "messages"
+        "name"
       ]
     },
     "configurations-definition": {
@@ -362,9 +301,12 @@
           },
           "name": {
             "type": "string"
+          },        
+          "actuators": {
+            "$ref": "#/components/ActuatorAttributes"
           },
-          "messages": {
-            "$ref": "#/components/DeviceMessagesEx"
+          "sensors": {
+            "$ref": "#/components/SensorAttributes"
           }
         },
         "required": [
