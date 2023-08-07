@@ -151,7 +151,7 @@ use super::protocol::{get_default_protocol_map, ProtocolIdentifierFactory, Proto
 use crate::{
   core::{
     errors::ButtplugDeviceError,
-    message::{ButtplugDeviceMessageType, Endpoint},
+    message::{Endpoint, ServerActuatorInfo, SensorInfo},
   },
   server::device::ServerDeviceIdentifier,
 };
@@ -258,8 +258,11 @@ pub struct ProtocolDeviceAttributes {
   name: Option<String>,
   /// User configured name of the device this instance represents, assuming one exists.
   display_name: Option<String>,
-  /// Message attributes for this device instance.
-  pub(super) message_attributes: ServerDeviceMessageAttributes,
+  /// List of all actuators (outputs, i.e. vibrators, linear movement systems, etc...) on the device
+  actuators: Option<HashMap<u32, ServerActuatorInfo>>,
+  /// List of all sensors (inputs, i.e. battery level, pressure, etc...) on the device
+  sensors: Option<HashMap<u32, SensorInfo>>,
+  raw: Option<Vec<Endpoint>>
 }
 
 impl ProtocolDeviceAttributes {
@@ -268,14 +271,18 @@ impl ProtocolDeviceAttributes {
     identifier: ProtocolAttributesType,
     name: Option<String>,
     display_name: Option<String>,
-    message_attributes: ServerDeviceMessageAttributes,
+    actuators: Option<HashMap<u32, ServerActuatorInfo>>,
+    sensors: Option<HashMap<u32, SensorInfo>>,
+    raw: Option<Vec<Endpoint>>,
     parent: Option<Arc<ProtocolDeviceAttributes>>,
   ) -> Self {
     Self {
       identifier,
       name,
       display_name,
-      message_attributes,
+      actuators,
+      sensors,
+      raw,
       parent,
     }
   }
@@ -291,7 +298,9 @@ impl ProtocolDeviceAttributes {
       parent: None,
       name: Some(self.name().to_owned()),
       display_name: self.display_name(),
-      message_attributes: self.message_attributes(),
+      actuators: self.actuators(),
+      sensors: self.sensors(),
+      raw: self.raw(),
     }
   }
 
@@ -332,6 +341,7 @@ impl ProtocolDeviceAttributes {
 
   /// Check to make sure the message attributes of an instance are valid.
   fn is_valid(&self) -> Result<(), ButtplugDeviceError> {
+    /*
     if let Some(attrs) = self.message_attributes.scalar_cmd() {
       for attr in attrs {
         attr.is_valid(&ButtplugDeviceMessageType::ScalarCmd)?;
@@ -347,15 +357,50 @@ impl ProtocolDeviceAttributes {
         attr.is_valid(&ButtplugDeviceMessageType::LinearCmd)?;
       }
     }
+    */
     Ok(())
   }
 
-  /// Check if a type of device message is supported by this instance.
-  pub fn allows_message(&self, message_type: &ButtplugDeviceMessageType) -> bool {
-    self.message_attributes.message_allowed(message_type)
+  pub fn actuators(&self) -> Option<HashMap<u32, ServerActuatorInfo>> {
+    if let Some(parent) = &self.parent {
+      if let Some(parent_actuators) = parent.actuators() {
+        let mut new_actuators = parent_actuators.clone();
+        if let Some(actuators) = self.actuators {
+          new_actuators.extend(actuators);
+        } 
+        Some(new_actuators)
+      } else {
+        self.actuators.clone()
+      }
+    } else {
+      self.actuators.clone()
+    }
+  }
+
+  pub fn sensors(&self) -> Option<HashMap<u32, SensorInfo>> {
+    if let Some(parent) = &self.parent {
+      if let Some(parent_sensors) = parent.sensors() {
+        let mut new_sensors = parent_sensors.clone();
+        if let Some(sensors) = self.sensors {
+          new_sensors.extend(sensors);
+        } 
+        Some(new_sensors)
+      } else {
+        self.sensors.clone()
+      }
+    } else {
+      self.sensors.clone()
+    }
+  }
+
+  pub fn raw(&self) -> Option<Vec<Endpoint>> {
+    // Unlike actuators and sensors, raw doesn't inherit because it's set by the device
+    // specifications itself, which are the same across all devices in a protocol.
+    self.raw.clone()
   }
 
   /// Retreive a map of all message attributes for this instance.
+  /*
   pub fn message_attributes(&self) -> ServerDeviceMessageAttributes {
     if let Some(parent) = &self.parent {
       parent.message_attributes().merge(&self.message_attributes)
@@ -363,11 +408,12 @@ impl ProtocolDeviceAttributes {
       self.message_attributes.clone()
     }
   }
+  */
 
   /// Add raw message support to the attributes of this instance. Requires a list of all endpoints a
   /// device supports.
   pub fn add_raw_messages(&mut self, endpoints: &[Endpoint]) {
-    self.message_attributes.add_raw_messages(endpoints);
+    //self.message_attributes.add_raw_messages(endpoints);
   }
 }
 
@@ -758,13 +804,7 @@ impl DeviceConfigurationManager {
 
 #[cfg(test)]
 mod test {
-  use super::{
-    server_device_message_attributes::{
-      ServerDeviceMessageAttributesBuilder,
-      ServerGenericDeviceMessageAttributes,
-    },
-    *,
-  };
+  use super::*;
   use std::{
     collections::{HashMap, HashSet},
     ops::RangeInclusive,
@@ -782,6 +822,17 @@ mod test {
       HashMap::new(),
     ));
     builder.communication_specifier("lovense", specifiers);
+    let mut attributes = HashMap::new();
+    attributes.insert(0, ServerActuatorInfo::new(
+      "Edge Vibrator 1",      
+      crate::core::message::ActuatorType::Vibrate,
+      &RangeInclusive::new(0, 20),
+    ));
+    attributes.insert(1, ServerActuatorInfo::new(
+      "Edge Vibrator 2",
+      crate::core::message::ActuatorType::Vibrate,
+      &RangeInclusive::new(0, 20),
+    ));
     builder.protocol_attributes(
       ProtocolAttributesIdentifier::new(
         "lovense",
@@ -792,22 +843,10 @@ mod test {
         ProtocolAttributesType::Identifier("P".to_owned()),
         Some("Lovense Edge".to_owned()),
         None,
-        ServerDeviceMessageAttributesBuilder::default()
-          .scalar_cmd(&vec![
-            ServerGenericDeviceMessageAttributes::new(
-              "Edge Vibrator 1",
-              &RangeInclusive::new(0, 20),
-              crate::core::message::ActuatorType::Vibrate,
-            ),
-            ServerGenericDeviceMessageAttributes::new(
-              "Edge Vibrator 2",
-              &RangeInclusive::new(0, 20),
-              crate::core::message::ActuatorType::Vibrate,
-            ),
-          ])
-          .finish(),
+        Some(attributes),
         None,
-      ),
+        None,
+        None),
     );
     builder.finish().unwrap()
   }
@@ -857,14 +896,14 @@ mod test {
     assert_eq!(config.name(), "Lovense Edge");
     // Make sure we overwrote the default of 1
     assert_eq!(
-      config
-        .message_attributes()
-        .scalar_cmd()
+      *config
+        .actuators()
         .as_ref()
         .expect("Test, assuming infallible")
-        .get(0)
+        .get(&0)
         .expect("Test, assuming infallible")
-        .step_count(),
+        .step_range()
+        .end(),
       20
     );
   }
@@ -890,11 +929,7 @@ mod test {
       .expect("Should be found");
     // Make sure we got the right name
     assert_eq!(config.name(), "Lovense Edge");
-    // Make sure we overwrote the default of 1
-    assert!(config.message_attributes().raw_read_cmd().is_some());
-    assert!(config.message_attributes().raw_write_cmd().is_some());
-    assert!(config.message_attributes().raw_subscribe_cmd().is_some());
-    assert!(config.message_attributes().raw_unsubscribe_cmd().is_some());
+    assert!(config.raw().is_some());
   }
 
   #[test]
@@ -918,11 +953,7 @@ mod test {
       .expect("Should be found");
     // Make sure we got the right name
     assert_eq!(config.name(), "Lovense Edge");
-    // Make sure we overwrote the default of 1
-    assert!(config.message_attributes().raw_read_cmd().is_none());
-    assert!(config.message_attributes().raw_write_cmd().is_none());
-    assert!(config.message_attributes().raw_subscribe_cmd().is_none());
-    assert!(config.message_attributes().raw_unsubscribe_cmd().is_none());
+    assert!(config.raw().is_some());
   }
 
   /*

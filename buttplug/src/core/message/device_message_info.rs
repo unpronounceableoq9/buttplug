@@ -15,7 +15,36 @@ use serde::{ser::SerializeSeq, Deserialize, Serialize, Serializer};
 /// Substructure of device messages, used for actuator information (name, messages supported, etc...)
 #[derive(Clone, Debug, PartialEq, Eq, MutGetters, Getters, CopyGetters)]
 #[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
-pub struct ActuatorInfo {
+pub struct ServerActuatorInfo {
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Descriptor"))]
+  #[getset(get = "pub")]
+  descriptor: String,
+  #[getset(get = "pub")]
+  #[serde(rename = "ActuatorType")]
+  actuator_type: ActuatorType,
+  #[serde(rename = "StepCount")]
+  #[getset(get = "pub")]
+  step_range: RangeInclusive<u32>,
+}
+
+impl ServerActuatorInfo {
+  pub fn new(
+    descriptor: &str,
+    actuator_type: ActuatorType,
+    step_range: &RangeInclusive<u32>
+  ) -> Self {
+    Self {
+      descriptor: descriptor.to_owned(),
+      actuator_type,
+      step_range: step_range.clone()
+    }
+  }
+}
+
+/// Substructure of device messages, used for actuator information (name, messages supported, etc...)
+#[derive(Clone, Debug, PartialEq, Eq, MutGetters, Getters, CopyGetters)]
+#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
+pub struct ClientActuatorInfo {
   #[cfg_attr(feature = "serialize-json", serde(rename = "Index"))]
   #[getset(get_copy = "pub")]
   index: u32,
@@ -28,6 +57,23 @@ pub struct ActuatorInfo {
   #[serde(rename = "StepCount")]
   #[getset(get = "pub")]
   step_count: u32,  
+}
+
+impl ClientActuatorInfo {
+  pub fn new(
+    index: u32,
+    descriptor: &str,
+    actuator_type: ActuatorType,
+    messages: &Vec<ButtplugDeviceMessageType>,
+    step_count: u32
+  ) -> Self {
+    Self {
+      index,
+      descriptor: descriptor.to_owned(),
+      actuator_type,
+      step_count
+    }
+  }
 }
 
 
@@ -102,7 +148,7 @@ pub struct DeviceMessageInfo {
     )
   )]
   #[getset(get = "pub")]
-  actuators: Option<Vec<ActuatorInfo>>,
+  actuators: Option<Vec<ServerActuatorInfo>>,
   #[cfg_attr(
     feature = "serialize-json",
     serde(
@@ -112,6 +158,29 @@ pub struct DeviceMessageInfo {
   )]
   #[getset(get = "pub")]
   sensors: Option<Vec<SensorInfo>>,
+  #[cfg_attr(
+    feature = "serialize-json",
+    serde(
+      rename = "Raw",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  #[getset(get = "pub")]
+  raw: Option<Vec<Endpoint>>,  
+}
+
+impl From<DeviceAdded> for DeviceMessageInfo {
+  fn from(device_added: DeviceAdded) -> Self {
+    Self {
+      index: device_added.index(),
+      name: device_added.name().clone(),
+      display_name: device_added.display_name().clone(),
+      message_timing_gap: *device_added.message_timing_gap(),
+      actuators: device_added.actuators().clone(),
+      sensors: device_added.sensors().clone(),
+      raw: device_added.raw().clone()
+    }
+  }
 }
 
 /// Substructure of device messages, used for attribute information (name, messages supported, etc...)
@@ -159,6 +228,12 @@ impl DeviceMessageInfoV3 {
       device_message_timing_gap: *device_message_timing_gap,
       device_messages,
     }
+  }
+}
+
+impl From<DeviceMessageInfo> for DeviceMessageInfoV3 {
+  fn from(device_info: DeviceMessageInfo) -> Self {
+    unimplemented!("Implement this conversion at some point when I have more sanity");
   }
 }
 

@@ -76,10 +76,12 @@ pub use client_device_message_attributes::{
 pub use device_added::{DeviceAdded, DeviceAddedV0, DeviceAddedV1, DeviceAddedV2, DeviceAddedV3};
 pub use device_list::{DeviceList, DeviceListV0, DeviceListV1, DeviceListV2, DeviceListV3};
 pub use device_message_info::{
+  ServerActuatorInfo,
   DeviceMessageInfoV0,
   DeviceMessageInfoV1,
   DeviceMessageInfoV2,
   DeviceMessageInfoV3,
+  SensorInfo,
 };
 pub use device_removed::DeviceRemoved;
 pub use endpoint::Endpoint;
@@ -135,6 +137,7 @@ pub enum ButtplugMessageSpecVersion {
   Version1 = 1,
   Version2 = 2,
   Version3 = 3,
+  Version4 = 4,
 }
 
 /// Message Id for events sent from the server, which are not in response to a
@@ -143,7 +146,7 @@ pub const BUTTPLUG_SERVER_EVENT_ID: u32 = 0;
 
 /// The current latest version of the spec implemented by the library.
 pub const BUTTPLUG_CURRENT_MESSAGE_SPEC_VERSION: ButtplugMessageSpecVersion =
-  ButtplugMessageSpecVersion::Version3;
+  ButtplugMessageSpecVersion::Version4;
 
 pub trait ButtplugMessageFinalizer {
   fn finalize(&mut self) {
@@ -499,8 +502,6 @@ pub enum ButtplugSpecV3ClientMessage {
   ButtplugMessage,
   ButtplugMessageValidator,
   ButtplugServerMessageType,
-  FromSpecificButtplugMessage,
-  TryFromButtplugServerMessage,
 )]
 #[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
 pub enum ButtplugSpecV3ServerMessage {
@@ -526,6 +527,38 @@ impl ButtplugMessageFinalizer for ButtplugSpecV3ServerMessage {
       ButtplugSpecV3ServerMessage::DeviceAdded(da) => da.finalize(),
       ButtplugSpecV3ServerMessage::DeviceList(dl) => dl.finalize(),
       _ => return,
+    }
+  }
+}
+
+
+// This was implementated as a derive, but for some reason the .into() calls
+// wouldn't work correctly when used as a device. If the actual implementation
+// is here, things work fine. Luckily it won't ever be changed much.
+impl TryFrom<ButtplugServerMessage> for ButtplugSpecV3ServerMessage {
+  type Error = ButtplugMessageError;
+  fn try_from(msg: ButtplugServerMessage) -> Result<Self, ButtplugMessageError> {
+    match msg {
+      ButtplugServerMessage::Ok(msg) => Ok(ButtplugSpecV3ServerMessage::Ok(msg)),
+      ButtplugServerMessage::Error(msg) => Ok(ButtplugSpecV3ServerMessage::Error(msg)),
+      ButtplugServerMessage::ServerInfo(msg) => Ok(ButtplugSpecV3ServerMessage::ServerInfo(msg)),
+      ButtplugServerMessage::DeviceList(msg) => {
+        Ok(ButtplugSpecV3ServerMessage::DeviceList(DeviceListV3::from(msg)))
+      }
+      ButtplugServerMessage::DeviceAdded(msg) => {
+        Ok(ButtplugSpecV3ServerMessage::DeviceAdded(DeviceAddedV3::from(msg)))
+      }
+      ButtplugServerMessage::DeviceRemoved(msg) => {
+        Ok(ButtplugSpecV3ServerMessage::DeviceRemoved(msg))
+      }
+      ButtplugServerMessage::ScanningFinished(msg) => {
+        Ok(ButtplugSpecV3ServerMessage::ScanningFinished(msg))
+      }
+      _ => Err(ButtplugMessageError::VersionError(
+        "ButtplugServerMessage".to_owned(),
+        format!("{:?}", msg),
+        "ButtplugSpecV2ServerMessage".to_owned(),
+      )),
     }
   }
 }
@@ -606,7 +639,7 @@ impl TryFrom<ButtplugServerMessage> for ButtplugSpecV2ServerMessage {
       ButtplugServerMessage::Error(msg) => Ok(ButtplugSpecV2ServerMessage::Error(msg)),
       ButtplugServerMessage::ServerInfo(msg) => Ok(ButtplugSpecV2ServerMessage::ServerInfo(msg)),
       ButtplugServerMessage::DeviceList(msg) => {
-        Ok(ButtplugSpecV2ServerMessage::DeviceList(msg.into()))
+        Ok(ButtplugSpecV2ServerMessage::DeviceList(DeviceListV2::from(msg)))
       }
       ButtplugServerMessage::DeviceAdded(msg) => {
         Ok(ButtplugSpecV2ServerMessage::DeviceAdded(msg.into()))

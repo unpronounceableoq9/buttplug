@@ -5,7 +5,7 @@
 // Licensed under the BSD 3-Clause license. See LICENSE file in the project root
 // for full license information.
 
-use super::device_message_info::{DeviceMessageInfoV0, DeviceMessageInfoV1, DeviceMessageInfoV2, DeviceMessageInfoV3, ActuatorInfo, SensorInfo};
+use super::device_message_info::{DeviceMessageInfoV0, DeviceMessageInfoV1, DeviceMessageInfoV2, DeviceMessageInfoV3, ServerActuatorInfo, SensorInfo, DeviceMessageInfo};
 use super::*;
 
 use getset::{CopyGetters, Getters};
@@ -50,7 +50,7 @@ pub struct DeviceAdded {
     )
   )]
   #[getset(get = "pub")]
-  actuators: Option<Vec<ActuatorInfo>>,
+  actuators: Option<Vec<ServerActuatorInfo>>,
   #[cfg_attr(
     feature = "serialize-json",
     serde(
@@ -60,6 +60,15 @@ pub struct DeviceAdded {
   )]
   #[getset(get = "pub")]
   sensors: Option<Vec<SensorInfo>>,
+  #[cfg_attr(
+    feature = "serialize-json",
+    serde(
+      rename = "Raw",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  #[getset(get = "pub")]
+  raw: Option<Vec<Endpoint>>,
 }
 
 impl DeviceAdded {
@@ -68,8 +77,9 @@ impl DeviceAdded {
     name: &str,
     display_name: &Option<String>,
     message_timing_gap: &Option<u32>,
-    actuators: &Option<Vec<ActuatorInfo>>,
-    sensors: &Option<Vec<SensorInfo>>
+    actuators: &Option<Vec<ServerActuatorInfo>>,
+    sensors: &Option<Vec<SensorInfo>>,
+    raw: &Option<Vec<Endpoint>>
   ) -> Self {
     let mut obj = Self {
       id: 0,
@@ -78,7 +88,8 @@ impl DeviceAdded {
       display_name: display_name.clone(),
       message_timing_gap: *message_timing_gap,
       actuators: actuators.clone(),
-      sensors: sensors.clone()
+      sensors: sensors.clone(),
+      raw: raw.clone()
     };
     obj.finalize();
     obj
@@ -164,6 +175,24 @@ impl ButtplugMessageFinalizer for DeviceAddedV3 {
   }
 }
 
+
+impl From<DeviceAdded> for DeviceAddedV3 {
+  fn from(msg: DeviceAdded) -> Self {
+    let id = msg.id();
+    let dmi = DeviceMessageInfo::from(msg);
+    let dmiv3 = DeviceMessageInfoV3::from(dmi);
+
+    Self {
+      id,
+      device_index: dmiv3.device_index(),
+      device_display_name: dmiv3.device_display_name().clone(),
+      device_name: dmiv3.device_name().clone(),
+      device_messages: dmiv3.device_messages().clone(),
+      device_message_timing_gap: *dmiv3.device_message_timing_gap()
+    }
+  }
+}
+
 #[derive(ButtplugMessage, Clone, Debug, PartialEq, Eq, Getters, CopyGetters)]
 #[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
 pub struct DeviceAddedV2 {
@@ -180,17 +209,18 @@ pub struct DeviceAddedV2 {
   device_messages: ClientDeviceMessageAttributesV2,
 }
 
-impl From<DeviceAddedV3> for DeviceAddedV2 {
-  fn from(msg: DeviceAddedV3) -> Self {
+impl From<DeviceAdded> for DeviceAddedV2 {
+  fn from(msg: DeviceAdded) -> Self {
     let id = msg.id();
-    let dmi = DeviceMessageInfoV3::from(msg);
-    let dmiv1 = DeviceMessageInfoV2::from(dmi);
+    let dmi = DeviceMessageInfo::from(msg);
+    let dmiv3 = DeviceMessageInfoV3::from(dmi);
+    let dmiv2 = DeviceMessageInfoV2::from(dmiv3);
 
     Self {
       id,
-      device_index: dmiv1.device_index(),
-      device_name: dmiv1.device_name().clone(),
-      device_messages: dmiv1.device_messages().clone(),
+      device_index: dmiv2.device_index(),
+      device_name: dmiv2.device_name().clone(),
+      device_messages: dmiv2.device_messages().clone(),
     }
   }
 }
@@ -220,10 +250,10 @@ pub struct DeviceAddedV1 {
   device_messages: ClientDeviceMessageAttributesV1,
 }
 
-impl From<DeviceAddedV3> for DeviceAddedV1 {
-  fn from(msg: DeviceAddedV3) -> Self {
+impl From<DeviceAdded> for DeviceAddedV1 {
+  fn from(msg: DeviceAdded) -> Self {
     let id = msg.id();
-    let dmi = DeviceMessageInfoV3::from(msg);
+    let dmi = DeviceMessageInfoV3::from(DeviceMessageInfo::from(msg));
     let dmiv2 = DeviceMessageInfoV2::from(dmi);
     let dmiv1 = DeviceMessageInfoV1::from(dmiv2);
 
@@ -261,10 +291,10 @@ pub struct DeviceAddedV0 {
   device_messages: Vec<ButtplugDeviceMessageType>,
 }
 
-impl From<DeviceAddedV3> for DeviceAddedV0 {
-  fn from(msg: DeviceAddedV3) -> Self {
+impl From<DeviceAdded> for DeviceAddedV0 {
+  fn from(msg: DeviceAdded) -> Self {
     let id = msg.id();
-    let dmi = DeviceMessageInfoV3::from(msg);
+    let dmi = DeviceMessageInfoV3::from(DeviceMessageInfo::from(msg));
     let dmiv2 = DeviceMessageInfoV2::from(dmi);
     let dmiv1 = DeviceMessageInfoV1::from(dmiv2);
     let dmiv0 = DeviceMessageInfoV0::from(dmiv1);

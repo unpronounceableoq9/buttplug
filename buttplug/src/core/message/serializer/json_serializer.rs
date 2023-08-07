@@ -25,6 +25,8 @@ use crate::core::{
     ButtplugSpecV2ServerMessage,
     ButtplugSpecV3ClientMessage,
     ButtplugSpecV3ServerMessage,
+    ButtplugSpecV4ServerMessage,
+    ButtplugSpecV4ClientMessage
   },
 };
 use jsonschema::JSONSchema;
@@ -172,7 +174,18 @@ fn serialize_to_version(
         })
         .collect();
       vec_to_protocol_json(&msg_vec)
-    }
+    },
+    ButtplugMessageSpecVersion::Version4 => {
+      let msg_vec: Vec<ButtplugSpecV4ServerMessage> = msgs
+        .iter()
+        .cloned()
+        .map(|msg| match ButtplugSpecV4ServerMessage::try_from(msg) {
+          Ok(msgv0) => msgv0,
+          Err(err) => ButtplugSpecV4ServerMessage::Error(ButtplugError::from(err).into()),
+        })
+        .collect();
+      vec_to_protocol_json(&msg_vec)
+    }    
   })
 }
 
@@ -218,6 +231,13 @@ impl ButtplugMessageSerializer for ButtplugServerJSONSerializer {
         }
         ButtplugMessageSpecVersion::Version3 => {
           deserialize_to_message::<ButtplugSpecV3ClientMessage>(&self.validator, msg)?
+            .iter()
+            .cloned()
+            .map(|m| m.into())
+            .collect()
+        }
+        ButtplugMessageSpecVersion::Version4 => {
+          deserialize_to_message::<ButtplugSpecV4ClientMessage>(&self.validator, msg)?
             .iter()
             .cloned()
             .map(|m| m.into())

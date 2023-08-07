@@ -71,6 +71,19 @@ impl ButtplugMessageFinalizer for DeviceListV3 {
   }
 }
 
+impl From<DeviceList> for DeviceListV3 {
+  fn from(msg: DeviceList) -> Self {
+    let mut devices = vec![];
+    for d in msg.devices {
+      devices.push(DeviceMessageInfoV3::from(d));
+    }
+    Self {
+      id: msg.id,
+      devices,
+    }
+  }
+}
+
 #[derive(Default, Clone, Debug, PartialEq, Eq, ButtplugMessage, Getters)]
 #[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
 pub struct DeviceListV2 {
@@ -85,7 +98,8 @@ impl From<DeviceList> for DeviceListV2 {
   fn from(msg: DeviceList) -> Self {
     let mut devices = vec![];
     for d in msg.devices {
-      devices.push(DeviceMessageInfoV2::from(d));
+      let dmiv3 = DeviceMessageInfoV3::from(d);
+      devices.push(DeviceMessageInfoV2::from(dmiv3));
     }
     Self {
       id: msg.id,
@@ -117,7 +131,7 @@ impl From<DeviceList> for DeviceListV1 {
   fn from(msg: DeviceList) -> Self {
     let mut devices = vec![];
     for d in msg.devices {
-      let dmiv2 = DeviceMessageInfoV2::from(d);
+      let dmiv2 = DeviceMessageInfoV2::from(DeviceMessageInfoV3::from(d));
       devices.push(DeviceMessageInfoV1::from(dmiv2));
     }
     Self {
@@ -150,7 +164,8 @@ impl From<DeviceList> for DeviceListV0 {
   fn from(msg: DeviceList) -> Self {
     let mut devices = vec![];
     for d in msg.devices {
-      let dmiv2 = DeviceMessageInfoV2::from(d);
+      let dmiv3 = DeviceMessageInfoV3::from(d);
+      let dmiv2 = DeviceMessageInfoV2::from(dmiv3);
       let dmiv1 = DeviceMessageInfoV1::from(dmiv2);
       devices.push(DeviceMessageInfoV0::from(dmiv1));
     }
