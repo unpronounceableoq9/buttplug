@@ -235,11 +235,7 @@ impl ServerDevice {
     //
     // Having raw turned on means it'll work for read/write/sub/unsub on any
     // endpoint so just use an arbitrary message here to check.
-    if self
-      .supports_message(&ButtplugDeviceCommandMessageUnion::RawSubscribeCmd(
-        RawSubscribeCmd::new(1, Endpoint::Tx),
-      ))
-      .is_ok()
+    if self.attributes.raw().is_some()
     {
       format!("{} (Raw Messages Allowed)", self.attributes.name())
     } else {

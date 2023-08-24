@@ -81,6 +81,7 @@ pub use device_message_info::{
   DeviceMessageInfoV1,
   DeviceMessageInfoV2,
   DeviceMessageInfoV3,
+  DeviceMessageInfo,
   SensorInfo,
 };
 pub use device_removed::DeviceRemoved;
