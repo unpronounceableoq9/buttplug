@@ -25,6 +25,10 @@ pub enum ActuatorType {
   // For instances where we specify a position to move to ASAP. Usually servos, probably for the
   // OSR-2/SR-6.
   Position,
+  // For RotateCmd,
+  RotateWithDirection,  
+  // For LinearCmd
+  PositionWithDuration,  
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
@@ -38,6 +42,7 @@ pub enum SensorType {
   // Accelerometer,
   // Gyro,
 }
+
 
 // This will look almost exactly like ServerDeviceMessageAttributes. However, it will only contain
 // information we want the client to know, i.e. step counts versus specific step ranges. This is

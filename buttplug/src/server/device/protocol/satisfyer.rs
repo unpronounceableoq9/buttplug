@@ -90,10 +90,15 @@ impl ProtocolInitializer for SatisfyerInitializer {
     let info_fut = hardware.write_value(&msg);
     info_fut.await?;
 
-    let mut feature_count = 2; // fallback to 2
-    if let Some(attrs) = attributes.message_attributes.scalar_cmd() {
-      feature_count = attrs.len();
-    }
+    let mut feature_count = attributes
+    .features()
+    .iter()
+    .filter(|x| x.actuator().and_then(|x| if x.messages().contains(&message::ButtplugDeviceMessageType::ScalarCmd) {
+      Some(x)
+    } else {
+      None
+    }).is_some())
+    .count();
     Ok(Arc::new(Satisfyer::new(hardware, feature_count)))
   }
 }

@@ -5,6 +5,7 @@
 // Licensed under the BSD 3-Clause license. See LICENSE file in the project root
 // for full license information.
 
+use crate::core::message::FeatureType;
 use crate::server::device::configuration::ProtocolDeviceAttributes;
 use crate::{
   core::{
@@ -44,25 +45,22 @@ impl ProtocolInitializer for LovenseConnectServiceInitializer {
   ) -> Result<Arc<dyn ProtocolHandler>, ButtplugDeviceError> {
     let mut protocol = LovenseConnectService::new(hardware.address());
 
-    if let Some(scalars) = attributes.message_attributes.scalar_cmd() {
-      protocol.vibrator_count = scalars
-        .clone()
-        .iter()
-        .filter(|x| [ActuatorType::Vibrate].contains(x.actuator_type()))
-        .count();
-      protocol.thusting_count = scalars
-        .clone()
-        .iter()
-        .filter(|x| [ActuatorType::Oscillate].contains(x.actuator_type()))
-        .count();
-
-      // The Ridge and Gravity both oscillate, but the Ridge only oscillates but takes
-      // the vibrate command... The Gravity has a vibe as well, and uses a Thrusting
-      // command for that oscillator.
-      if protocol.vibrator_count == 0 && protocol.thusting_count != 0 {
-        protocol.vibrator_count = protocol.thusting_count;
-        protocol.thusting_count = 0;
-      }
+    protocol.vibrator_count = attributes
+      .features()
+      .iter()
+      .filter(|x| *x.feature_type() == FeatureType::Vibrate)
+      .count();
+    protocol.thusting_count = attributes
+      .features()
+      .iter()
+      .filter(|x| *x.feature_type() == FeatureType::Oscillate)
+      .count();
+    // The Ridge and Gravity both oscillate, but the Ridge only oscillates but takes
+    // the vibrate command... The Gravity has a vibe as well, and uses a Thrusting
+    // command for that oscillator.
+    if protocol.vibrator_count == 0 && protocol.thusting_count != 0 {
+      protocol.vibrator_count = protocol.thusting_count;
+      protocol.thusting_count = 0;
     }
 
     if hardware.name() == "Solace" {

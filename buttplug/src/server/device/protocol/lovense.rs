@@ -5,6 +5,7 @@
 // Licensed under the BSD 3-Clause license. See LICENSE file in the project root
 // for full license information.
 
+use crate::core::message::FeatureType;
 use crate::server::device::configuration::ProtocolDeviceAttributes;
 use crate::{
   core::{
@@ -148,21 +149,29 @@ impl ProtocolInitializer for LovenseInitializer {
     let mut protocol = Lovense::default();
     protocol.device_type = self.device_type.clone();
 
-    if let Some(scalars) = attributes.message_attributes.scalar_cmd() {
-      protocol.vibrator_count = scalars
-        .clone()
-        .iter()
-        .filter(|x| [ActuatorType::Vibrate, ActuatorType::Oscillate].contains(x.actuator_type()))
-        .count();
+    protocol.vibrator_count = attributes
+    .features()
+    .iter()
+    .filter(|x| *x.feature_type() == FeatureType::Vibrate)
+    .count();
 
-      // This might need better tuning if other complex Lovenses are released
-      // Currently this only applies to the Flexer/Lapis/Solace
-      if (protocol.vibrator_count == 2 && scalars.len() > 2)
-        || protocol.vibrator_count > 2
-        || protocol.device_type == "H"
-      {
-        protocol.use_mply = true;
-      }
+    let scalar_count = attributes
+    .features()
+    .iter()
+    .filter(|x| x.actuator().and_then(|y| if y.messages().contains(&message::ButtplugDeviceMessageType::ScalarCmd) {
+      Some(y)
+    } else {
+      None
+    }).is_some())
+    .count();
+
+    // This might need better tuning if other complex Lovenses are released
+    // Currently this only applies to the Flexer/Lapis/Solace
+    if (protocol.vibrator_count == 2 && scalar_count > 2)
+      || protocol.vibrator_count > 2
+      || protocol.device_type == "H"
+    {
+      protocol.use_mply = true;
     }
 
     debug!(

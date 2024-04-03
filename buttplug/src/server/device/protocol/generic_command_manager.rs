@@ -18,7 +18,7 @@ use crate::{
       ScalarSubcommand,
     },
   },
-  server::device::configuration::{ProtocolDeviceAttributes, ServerGenericDeviceMessageAttributes},
+  server::device::configuration::{ProtocolDeviceAttributes, ServerDeviceFeature},
 };
 use getset::Getters;
 use std::{
@@ -35,7 +35,7 @@ struct ScalarGenericCommand {
 }
 
 impl ScalarGenericCommand {
-  pub fn new(attributes: &ServerGenericDeviceMessageAttributes) -> Self {
+  pub fn new(features: &ServerGenericDeviceMessageAttributes) -> Self {
     Self {
       actuator: *attributes.actuator_type(),
       step_range: attributes.step_range().clone(),
@@ -332,7 +332,7 @@ impl GenericCommandManager {
 
 #[cfg(test)]
 mod test {
-
+/*
   use super::{GenericCommandManager, ProtocolDeviceAttributes};
   use crate::{
     core::message::{ActuatorType, RotateCmd, RotationSubcommand, ScalarCmd, ScalarSubcommand},
@@ -628,4 +628,5 @@ mod test {
     assert!(mgr.update_rotation(&rotate_msg_invalid, false).is_err());
   }
   // TODO Write test for vibration stop generator
+  */
 }

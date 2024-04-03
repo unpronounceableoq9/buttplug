@@ -15,24 +15,7 @@ use crate::{
   core::{
     errors::{ButtplugDeviceError, ButtplugError},
     message::{
-      self,
-      ActuatorType,
-      BatteryLevelReading,
-      ButtplugDeviceCommandMessageUnion,
-      ButtplugDeviceMessage,
-      ButtplugDeviceMessageType,
-      ButtplugMessage,
-      ButtplugServerDeviceMessage,
-      ButtplugServerMessage,
-      Endpoint,
-      RSSILevelReading,
-      RawReading,
-      RawSubscribeCmd,
-      ScalarCmd,
-      ScalarSubcommand,
-      SensorDeviceMessageAttributes,
-      SensorReadCmd,
-      SensorType,
+      self, ActuatorType, BatteryLevelReading, ButtplugDeviceCommandMessageUnion, ButtplugDeviceMessage, ButtplugDeviceMessageType, ButtplugMessage, ButtplugServerDeviceMessage, ButtplugServerMessage, DeviceFeature, Endpoint, RSSILevelReading, RawReading, RawSubscribeCmd, ScalarCmd, ScalarSubcommand, SensorDeviceMessageAttributes, SensorReadCmd, SensorType
     },
     ButtplugResultFuture,
   },
@@ -55,7 +38,7 @@ use tokio::sync::RwLock;
 use tokio_stream::StreamExt;
 
 use super::{
-  configuration::{ProtocolDeviceAttributes, ServerDeviceMessageAttributes},
+  configuration::ProtocolDeviceAttributes,
   hardware::HardwareWriteCmd,
   protocol::{
     generic_command_manager::GenericCommandManager,
@@ -295,7 +278,7 @@ impl ServerDevice {
   }
 
   /// Get the user created display name for a device, if one exists.
-  pub fn display_name(&self) -> Option<String> {
+  pub fn display_name(&self) -> &Option<String> {
     self.attributes.display_name()
   }
 
@@ -329,8 +312,8 @@ impl ServerDevice {
   }
 
   /// Retreive the message attributes for the device.
-  pub fn message_attributes(&self) -> ServerDeviceMessageAttributes {
-    self.attributes.message_attributes()
+  pub fn features(&self) -> &Vec<DeviceFeature> {
+    self.attributes.features()
   }
 
   /// Retreive the event stream for the device.

@@ -17,6 +17,7 @@ mod battery_level_cmd;
 mod battery_level_reading;
 mod client_device_message_attributes;
 mod device_added;
+mod device_feature;
 mod device_list;
 mod device_message_info;
 mod device_removed;
@@ -72,6 +73,14 @@ pub use client_device_message_attributes::{
   RawDeviceMessageAttributes,
   SensorDeviceMessageAttributes,
   SensorType,
+};
+pub use device_feature::{
+  DeviceFeature,
+  DeviceFeatureActuator,
+  DeviceFeatureBuilder,
+  DeviceFeatureRaw,
+  DeviceFeatureSensor,
+  FeatureType
 };
 pub use device_added::{DeviceAdded, DeviceAddedV0, DeviceAddedV1, DeviceAddedV2};
 pub use device_list::{DeviceList, DeviceListV0, DeviceListV1, DeviceListV2};
