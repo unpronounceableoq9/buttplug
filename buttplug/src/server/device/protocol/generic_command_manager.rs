@@ -18,7 +18,7 @@ use crate::{
       ScalarSubcommand,
     },
   },
-  server::device::configuration::{ProtocolDeviceAttributes, ServerDeviceFeature},
+  server::device::configuration::ProtocolDeviceAttributes,
 };
 use getset::Getters;
 use std::{

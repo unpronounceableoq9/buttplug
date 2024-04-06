@@ -13,6 +13,8 @@ use getset::{Getters, MutGetters, Setters};
 use serde::{ser::SerializeSeq, Deserialize, Serialize, Serializer};
 use std::ops::RangeInclusive;
 
+use super::{DeviceFeature, FeatureType};
+
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActuatorType {
   Unknown,
@@ -25,10 +27,22 @@ pub enum ActuatorType {
   // For instances where we specify a position to move to ASAP. Usually servos, probably for the
   // OSR-2/SR-6.
   Position,
-  // For RotateCmd,
-  RotateWithDirection,  
-  // For LinearCmd
-  PositionWithDuration,  
+}
+
+impl TryFrom<&FeatureType> for ActuatorType {
+  type Error = String;
+  fn try_from(value: &FeatureType) -> Result<Self, Self::Error> {
+      match *value {
+        FeatureType::Unknown => Ok(ActuatorType::Unknown),
+        FeatureType::Vibrate => Ok(ActuatorType::Vibrate),
+        FeatureType::Rotate => Ok(ActuatorType::Rotate),
+        FeatureType::Oscillate => Ok(ActuatorType::Oscillate),
+        FeatureType::Constrict => Ok(ActuatorType::Constrict),
+        FeatureType::Inflate => Ok(ActuatorType::Inflate),
+        FeatureType::Position => Ok(ActuatorType::Position),
+        _ => Err(format!("Feature type {value} not valid for ActuatorType conversion"))
+      }
+  }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
@@ -115,6 +129,42 @@ pub struct ClientDeviceMessageAttributes {
   vorze_a10_cyclone_cmd: Option<NullDeviceMessageAttributes>,
 }
 
+impl From<&Vec<DeviceFeature>> for ClientDeviceMessageAttributes {
+  fn from(features: &Vec<DeviceFeature>) -> Self {
+
+    let actuator_filter = |message_type| {
+      let attrs: Vec<ClientGenericDeviceMessageAttributes> = features
+      .iter()
+      .filter(|x| {
+        if let Some(actuator) = x.actuator() {
+          actuator.messages().contains(message_type)
+        } else {
+          false
+        }
+      })
+      .map(|x| x.try_into().unwrap())
+      .collect();
+      if !attrs.is_empty() {
+        Some(attrs)
+      } else {
+        None
+      }
+    };
+
+    // Sensor Messages
+
+    // Raw messages
+
+    Self {
+      scalar_cmd: actuator_filter(&ButtplugDeviceMessageType::ScalarCmd),
+      rotate_cmd: actuator_filter(&ButtplugDeviceMessageType::RotateCmd),
+      linear_cmd: actuator_filter(&ButtplugDeviceMessageType::LinearCmd),
+      ..Default::default()
+    }
+  }
+}
+
+
 impl ClientDeviceMessageAttributes {
   pub fn raw_unsubscribe_cmd(&self) -> &Option<RawDeviceMessageAttributes> {
     self.raw_subscribe_cmd()
@@ -165,21 +215,7 @@ impl ClientDeviceMessageAttributes {
   }
 
   pub fn finalize(&mut self) {
-    if let Some(scalar_attrs) = &mut self.scalar_cmd {
-      for (i, attr) in scalar_attrs.into_iter().enumerate() {
-        attr.index = i as u32;
-      }
-    }
-    if let Some(sensor_read_attrs) = &mut self.sensor_read_cmd {
-      for (i, attr) in sensor_read_attrs.into_iter().enumerate() {
-        attr.index = i as u32;
-      }
-    }
-    if let Some(sensor_subscribe_attrs) = &mut self.sensor_subscribe_cmd {
-      for (i, attr) in sensor_subscribe_attrs.into_iter().enumerate() {
-        attr.index = i as u32;
-      }
-    }
+    
   }
 }
 
@@ -254,10 +290,23 @@ pub struct ClientGenericDeviceMessageAttributes {
   #[serde(rename = "StepCount")]
   #[getset(get = "pub")]
   step_count: u32,
-  // TODO This needs to actually be part of the device info relayed to the client in spec v4.
-  #[getset(get = "pub")]
-  #[serde(skip, default)]
-  index: u32,
+}
+
+impl TryFrom<&DeviceFeature> for ClientGenericDeviceMessageAttributes {
+  type Error = String;
+  fn try_from(value: &DeviceFeature) -> Result<Self, Self::Error> {
+    if let Some(actuator) = value.actuator() {
+      let actuator_type = value.feature_type().try_into()?;
+      let attrs = Self {
+        feature_descriptor: value.description().to_owned(),
+        actuator_type,
+        step_count: *actuator.step_count()
+      };
+      Ok(attrs)
+    } else {
+      Err(format!("Cannot produce a GenericDeviceMessageAttribute from a feature with no actuator member"))
+    }
+  }
 }
 
 impl ClientGenericDeviceMessageAttributes {
@@ -266,7 +315,6 @@ impl ClientGenericDeviceMessageAttributes {
       feature_descriptor: feature_descriptor.to_owned(),
       actuator_type,
       step_count,
-      index: 0,
     }
   }
 
