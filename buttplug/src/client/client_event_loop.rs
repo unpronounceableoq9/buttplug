@@ -18,12 +18,7 @@ use crate::core::{
   connector::{ButtplugConnector, ButtplugConnectorStateShared},
   errors::{ButtplugDeviceError, ButtplugError},
   message::{
-    ButtplugCurrentSpecClientMessage,
-    ButtplugCurrentSpecServerMessage,
-    ButtplugDeviceMessage,
-    ButtplugMessageValidator,
-    DeviceList,
-    DeviceMessageInfo,
+    ButtplugCurrentSpecClientMessage, ButtplugCurrentSpecServerMessage, ButtplugDeviceMessage, ButtplugMessageValidator, DeviceListV3, DeviceMessageInfoV3
   },
 };
 use dashmap::DashMap;
@@ -41,7 +36,7 @@ pub enum ButtplugClientRequest {
   Disconnect(ButtplugConnectorStateShared),
   /// Given a DeviceList message, update the inner loop values and create
   /// events for additions.
-  HandleDeviceList(DeviceList),
+  HandleDeviceList(DeviceListV3),
   /// Client request to send a message via the connector.
   ///
   /// Bundled future should have reply set and waker called when this is
@@ -136,7 +131,7 @@ where
   /// Given a [DeviceMessageInfo] from a [DeviceAdded] or [DeviceList] message,
   /// creates a ButtplugClientDevice and adds it the internal device map, then
   /// returns the instance.
-  fn create_client_device(&mut self, info: &DeviceMessageInfo) -> Arc<ButtplugClientDevice> {
+  fn create_client_device(&mut self, info: &DeviceMessageInfoV3) -> Arc<ButtplugClientDevice> {
     debug!(
       "Trying to create a client device from DeviceMessageInfo: {:?}",
       info
@@ -226,7 +221,7 @@ where
           ));
           return;
         }
-        let info = DeviceMessageInfo::from(dev);
+        let info = DeviceMessageInfoV3::from(dev);
         let device = self.create_client_device(&info);
         self.send_client_event(ButtplugClientEvent::DeviceAdded(device));
       }
@@ -249,7 +244,7 @@ where
           device
             .value()
             .queue_event(ButtplugClientDeviceEvent::Message(
-              ButtplugCurrentSpecServerMessage::from(msg),
+              ButtplugCurrentSpecServerMessage::RawReading(msg),
             ));
         }
       }
@@ -259,7 +254,7 @@ where
           device
             .value()
             .queue_event(ButtplugClientDeviceEvent::Message(
-              ButtplugCurrentSpecServerMessage::from(msg),
+              ButtplugCurrentSpecServerMessage::SensorReading(msg),
             ));
         }
       }

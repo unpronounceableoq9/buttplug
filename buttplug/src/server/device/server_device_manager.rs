@@ -321,7 +321,7 @@ impl ServerDeviceManager {
               &dev.name(),
               &dev.display_name(),
               &None,
-              dev.features().into(),
+              dev.features(),
             )
           })
           .collect();

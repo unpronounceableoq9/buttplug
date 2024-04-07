@@ -32,16 +32,16 @@ pub enum ActuatorType {
 impl TryFrom<&FeatureType> for ActuatorType {
   type Error = String;
   fn try_from(value: &FeatureType) -> Result<Self, Self::Error> {
-      match *value {
-        FeatureType::Unknown => Ok(ActuatorType::Unknown),
-        FeatureType::Vibrate => Ok(ActuatorType::Vibrate),
-        FeatureType::Rotate => Ok(ActuatorType::Rotate),
-        FeatureType::Oscillate => Ok(ActuatorType::Oscillate),
-        FeatureType::Constrict => Ok(ActuatorType::Constrict),
-        FeatureType::Inflate => Ok(ActuatorType::Inflate),
-        FeatureType::Position => Ok(ActuatorType::Position),
-        _ => Err(format!("Feature type {value} not valid for ActuatorType conversion"))
-      }
+    match *value {
+      FeatureType::Unknown => Ok(ActuatorType::Unknown),
+      FeatureType::Vibrate => Ok(ActuatorType::Vibrate),
+      FeatureType::Rotate => Ok(ActuatorType::Rotate),
+      FeatureType::Oscillate => Ok(ActuatorType::Oscillate),
+      FeatureType::Constrict => Ok(ActuatorType::Constrict),
+      FeatureType::Inflate => Ok(ActuatorType::Inflate),
+      FeatureType::Position => Ok(ActuatorType::Position),
+      _ => Err(format!("Feature type {value} not valid for ActuatorType conversion"))
+    }
   }
 }
 
@@ -57,6 +57,19 @@ pub enum SensorType {
   // Gyro,
 }
 
+impl TryFrom<&FeatureType> for SensorType {
+  type Error = String;
+  fn try_from(value: &FeatureType) -> Result<Self, Self::Error> {
+    match *value {
+      FeatureType::Unknown => Ok(SensorType::Unknown),
+      FeatureType::Battery => Ok(SensorType::Battery),
+      FeatureType::RSSI => Ok(SensorType::RSSI),
+      FeatureType::Button => Ok(SensorType::Button),
+      FeatureType::Pressure => Ok(SensorType::Pressure),
+      _ => Err(format!("Feature type {value} not valid for SensorType conversion"))
+    }
+  }
+}
 
 // This will look almost exactly like ServerDeviceMessageAttributes. However, it will only contain
 // information we want the client to know, i.e. step counts versus specific step ranges. This is
@@ -151,14 +164,35 @@ impl From<&Vec<DeviceFeature>> for ClientDeviceMessageAttributes {
       }
     };
 
-    // Sensor Messages
+    let sensor_filter = |message_type| {
+      let attrs: Vec<SensorDeviceMessageAttributes> = features
+      .iter()
+      .filter(|x| {
+        if let Some(sensor) = x.sensor() {
+          sensor.messages().contains(message_type)
+        } else {
+          false
+        }
+      })
+      .map(|x| x.try_into().unwrap())
+      .collect();
+      if !attrs.is_empty() {
+        Some(attrs)
+      } else {
+        None
+      }
+    };
 
     // Raw messages
+
+    
 
     Self {
       scalar_cmd: actuator_filter(&ButtplugDeviceMessageType::ScalarCmd),
       rotate_cmd: actuator_filter(&ButtplugDeviceMessageType::RotateCmd),
       linear_cmd: actuator_filter(&ButtplugDeviceMessageType::LinearCmd),
+      sensor_read_cmd: sensor_filter(&ButtplugDeviceMessageType::SensorReadCmd),
+      sensor_subscribe_cmd: sensor_filter(&ButtplugDeviceMessageType::SensorSubscribeCmd),
       ..Default::default()
     }
   }
@@ -290,6 +324,10 @@ pub struct ClientGenericDeviceMessageAttributes {
   #[serde(rename = "StepCount")]
   #[getset(get = "pub")]
   step_count: u32,
+  // TODO This needs to actually be part of the device info relayed to the client in spec v4.
+  #[getset(get = "pub")]
+  #[serde(skip, default)]
+  index: u32,  
 }
 
 impl TryFrom<&DeviceFeature> for ClientGenericDeviceMessageAttributes {
@@ -300,7 +338,8 @@ impl TryFrom<&DeviceFeature> for ClientGenericDeviceMessageAttributes {
       let attrs = Self {
         feature_descriptor: value.description().to_owned(),
         actuator_type,
-        step_count: *actuator.step_count()
+        step_count: *actuator.step_count(),
+        index: 0,
       };
       Ok(attrs)
     } else {
@@ -315,6 +354,7 @@ impl ClientGenericDeviceMessageAttributes {
       feature_descriptor: feature_descriptor.to_owned(),
       actuator_type,
       step_count,
+      index: 0,
     }
   }
 
@@ -341,7 +381,7 @@ impl RawDeviceMessageAttributes {
 }
 
 fn range_sequence_serialize<S>(
-  range_vec: &Vec<RangeInclusive<u32>>,
+  range_vec: &Vec<RangeInclusive<i32>>,
   serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -364,11 +404,27 @@ pub struct SensorDeviceMessageAttributes {
   sensor_type: SensorType,
   #[getset(get = "pub")]
   #[serde(rename = "SensorRange", serialize_with = "range_sequence_serialize")]
-  sensor_range: Vec<RangeInclusive<u32>>,
+  sensor_range: Vec<RangeInclusive<i32>>,
   // TODO This needs to actually be part of the device info relayed to the client in spec v4.
   #[getset(get = "pub")]
   #[serde(skip, default)]
-  index: u32,
+  index: u32, 
+}
+
+impl TryFrom<&DeviceFeature> for SensorDeviceMessageAttributes {
+  type Error = String;
+  fn try_from(value: &DeviceFeature) -> Result<Self, Self::Error> {
+    if let Some(sensor) = value.sensor() {
+      Ok(Self {
+        feature_descriptor: value.description().to_owned(),
+        sensor_type: value.feature_type().try_into()?,
+        sensor_range: sensor.value_range().clone(),
+        index: 0
+      })
+    } else {
+      Err("Device Feature does not expose a sensor.".to_owned())
+    }
+  }
 }
 
 /*

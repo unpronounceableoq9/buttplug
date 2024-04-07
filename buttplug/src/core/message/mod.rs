@@ -13,6 +13,18 @@
 //! are also enum types that are used to classify messages into categories, for instance, messages
 //! that only should be sent by a client or server.
 
+
+mod spec_v0;
+pub use spec_v0::{ButtplugSpecV0ClientMessage, ButtplugSpecV0ServerMessage};
+mod spec_v1;
+pub use spec_v1::{ButtplugSpecV1ClientMessage, ButtplugSpecV1ServerMessage};
+mod spec_v2;
+pub use spec_v2::{ButtplugSpecV2ClientMessage, ButtplugSpecV2ServerMessage};
+mod spec_v3;
+pub use spec_v3::{ButtplugSpecV3ClientMessage, ButtplugSpecV3ServerMessage};
+mod spec_v4;
+pub use spec_v4::{ButtplugSpecV4ClientMessage, ButtplugSpecV4ServerMessage};
+
 mod battery_level_cmd;
 mod battery_level_reading;
 mod client_device_message_attributes;
@@ -82,13 +94,14 @@ pub use device_feature::{
   DeviceFeatureSensor,
   FeatureType
 };
-pub use device_added::{DeviceAdded, DeviceAddedV0, DeviceAddedV1, DeviceAddedV2};
-pub use device_list::{DeviceList, DeviceListV0, DeviceListV1, DeviceListV2};
+pub use device_added::{DeviceAddedV3, DeviceAddedV0, DeviceAddedV1, DeviceAddedV2, DeviceAdded};
+pub use device_list::{DeviceListV3, DeviceListV0, DeviceListV1, DeviceListV2, DeviceList};
 pub use device_message_info::{
-  DeviceMessageInfo,
   DeviceMessageInfoV0,
   DeviceMessageInfoV1,
   DeviceMessageInfoV2,
+  DeviceMessageInfoV3,
+  DeviceMessageInfo,
 };
 pub use device_removed::DeviceRemoved;
 pub use endpoint::Endpoint;
@@ -385,366 +398,6 @@ pub type ButtplugCurrentSpecClientMessage = ButtplugSpecV3ClientMessage;
 /// Type alias for the latest version of server-to-client messages.
 pub type ButtplugCurrentSpecServerMessage = ButtplugSpecV3ServerMessage;
 
-/// Represents all client-to-server messages in v3 of the Buttplug Spec
-#[derive(
-  Debug,
-  Clone,
-  PartialEq,
-  ButtplugMessage,
-  ButtplugMessageValidator,
-  ButtplugClientMessageType,
-  ButtplugMessageFinalizer,
-  FromSpecificButtplugMessage,
-  TryFromButtplugClientMessage,
-)]
-#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
-pub enum ButtplugSpecV3ClientMessage {
-  // Handshake messages
-  RequestServerInfo(RequestServerInfo),
-  Ping(Ping),
-  // Device enumeration messages
-  StartScanning(StartScanning),
-  StopScanning(StopScanning),
-  RequestDeviceList(RequestDeviceList),
-  // Generic commands
-  StopAllDevices(StopAllDevices),
-  VibrateCmd(VibrateCmd),
-  LinearCmd(LinearCmd),
-  RotateCmd(RotateCmd),
-  RawWriteCmd(RawWriteCmd),
-  RawReadCmd(RawReadCmd),
-  StopDeviceCmd(StopDeviceCmd),
-  RawSubscribeCmd(RawSubscribeCmd),
-  RawUnsubscribeCmd(RawUnsubscribeCmd),
-  ScalarCmd(ScalarCmd),
-  // Sensor commands
-  SensorReadCmd(SensorReadCmd),
-  SensorSubscribeCmd(SensorSubscribeCmd),
-  SensorUnsubscribeCmd(SensorUnsubscribeCmd),
-}
-
-/// Represents all server-to-client messages in v3 of the Buttplug Spec
-#[derive(
-  Debug,
-  Clone,
-  PartialEq,
-  ButtplugMessage,
-  ButtplugMessageValidator,
-  ButtplugServerMessageType,
-  FromSpecificButtplugMessage,
-  TryFromButtplugServerMessage,
-)]
-#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
-pub enum ButtplugSpecV3ServerMessage {
-  // Status messages
-  Ok(Ok),
-  Error(Error),
-  // Handshake messages
-  ServerInfo(ServerInfo),
-  // Device enumeration messages
-  DeviceList(DeviceList),
-  DeviceAdded(DeviceAdded),
-  DeviceRemoved(DeviceRemoved),
-  ScanningFinished(ScanningFinished),
-  // Generic commands
-  RawReading(RawReading),
-  // Sensor commands
-  SensorReading(SensorReading),
-}
-
-impl ButtplugMessageFinalizer for ButtplugSpecV3ServerMessage {
-  fn finalize(&mut self) {
-    match self {
-      ButtplugSpecV3ServerMessage::DeviceAdded(da) => da.finalize(),
-      ButtplugSpecV3ServerMessage::DeviceList(dl) => dl.finalize(),
-      _ => return,
-    }
-  }
-}
-
-/// Represents all client-to-server messages in v2 of the Buttplug Spec
-#[derive(
-  Debug,
-  Clone,
-  PartialEq,
-  ButtplugMessage,
-  ButtplugMessageValidator,
-  ButtplugClientMessageType,
-  ButtplugMessageFinalizer,
-  FromSpecificButtplugMessage,
-  TryFromButtplugClientMessage,
-)]
-#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
-pub enum ButtplugSpecV2ClientMessage {
-  // Handshake messages
-  RequestServerInfo(RequestServerInfo),
-  Ping(Ping),
-  // Device enumeration messages
-  StartScanning(StartScanning),
-  StopScanning(StopScanning),
-  RequestDeviceList(RequestDeviceList),
-  // Generic commands
-  StopAllDevices(StopAllDevices),
-  VibrateCmd(VibrateCmd),
-  LinearCmd(LinearCmd),
-  RotateCmd(RotateCmd),
-  RawWriteCmd(RawWriteCmd),
-  RawReadCmd(RawReadCmd),
-  StopDeviceCmd(StopDeviceCmd),
-  RawSubscribeCmd(RawSubscribeCmd),
-  RawUnsubscribeCmd(RawUnsubscribeCmd),
-  // Sensor commands
-  BatteryLevelCmd(BatteryLevelCmd),
-  RSSILevelCmd(RSSILevelCmd),
-}
-
-/// Represents all server-to-client messages in v2 of the Buttplug Spec
-#[derive(
-  Debug,
-  Clone,
-  PartialEq,
-  ButtplugMessage,
-  ButtplugMessageValidator,
-  ButtplugMessageFinalizer,
-  ButtplugServerMessageType,
-)]
-#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
-pub enum ButtplugSpecV2ServerMessage {
-  // Status messages
-  Ok(Ok),
-  Error(Error),
-  // Handshake messages
-  ServerInfo(ServerInfo),
-  // Device enumeration messages
-  DeviceList(DeviceListV2),
-  DeviceAdded(DeviceAddedV2),
-  DeviceRemoved(DeviceRemoved),
-  ScanningFinished(ScanningFinished),
-  // Generic commands
-  RawReading(RawReading),
-  // Sensor commands
-  BatteryLevelReading(BatteryLevelReading),
-  RSSILevelReading(RSSILevelReading),
-}
-
-// This was implementated as a derive, but for some reason the .into() calls
-// wouldn't work correctly when used as a device. If the actual implementation
-// is here, things work fine. Luckily it won't ever be changed much.
-impl TryFrom<ButtplugServerMessage> for ButtplugSpecV2ServerMessage {
-  type Error = ButtplugMessageError;
-  fn try_from(msg: ButtplugServerMessage) -> Result<Self, ButtplugMessageError> {
-    match msg {
-      ButtplugServerMessage::Ok(msg) => Ok(ButtplugSpecV2ServerMessage::Ok(msg)),
-      ButtplugServerMessage::Error(msg) => Ok(ButtplugSpecV2ServerMessage::Error(msg)),
-      ButtplugServerMessage::ServerInfo(msg) => Ok(ButtplugSpecV2ServerMessage::ServerInfo(msg)),
-      ButtplugServerMessage::DeviceList(msg) => {
-        Ok(ButtplugSpecV2ServerMessage::DeviceList(msg.into()))
-      }
-      ButtplugServerMessage::DeviceAdded(msg) => {
-        Ok(ButtplugSpecV2ServerMessage::DeviceAdded(msg.into()))
-      }
-      ButtplugServerMessage::DeviceRemoved(msg) => {
-        Ok(ButtplugSpecV2ServerMessage::DeviceRemoved(msg))
-      }
-      ButtplugServerMessage::ScanningFinished(msg) => {
-        Ok(ButtplugSpecV2ServerMessage::ScanningFinished(msg))
-      }
-      _ => Err(ButtplugMessageError::VersionError(
-        "ButtplugServerMessage".to_owned(),
-        format!("{:?}", msg),
-        "ButtplugSpecV2ServerMessage".to_owned(),
-      )),
-    }
-  }
-}
-
-/// Represents all client-to-server messages in v1 of the Buttplug Spec
-#[derive(
-  Debug,
-  Clone,
-  PartialEq,
-  ButtplugMessage,
-  ButtplugMessageValidator,
-  ButtplugClientMessageType,
-  ButtplugMessageFinalizer,
-  TryFromButtplugClientMessage,
-)]
-#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
-pub enum ButtplugSpecV1ClientMessage {
-  // Handshake messages
-  RequestServerInfo(RequestServerInfo),
-  Ping(Ping),
-  // Device enumeration messages
-  StartScanning(StartScanning),
-  StopScanning(StopScanning),
-  RequestDeviceList(RequestDeviceList),
-  // Generic commands
-  StopAllDevices(StopAllDevices),
-  VibrateCmd(VibrateCmd),
-  LinearCmd(LinearCmd),
-  RotateCmd(RotateCmd),
-  StopDeviceCmd(StopDeviceCmd),
-  // Deprecated generic commands
-  SingleMotorVibrateCmd(SingleMotorVibrateCmd),
-  // Deprecated device specific commands
-  FleshlightLaunchFW12Cmd(FleshlightLaunchFW12Cmd),
-  LovenseCmd(LovenseCmd),
-  KiirooCmd(KiirooCmd),
-  VorzeA10CycloneCmd(VorzeA10CycloneCmd),
-}
-
-/// Represents all server-to-client messages in v2 of the Buttplug Spec
-#[derive(
-  Debug,
-  Clone,
-  PartialEq,
-  Eq,
-  ButtplugMessage,
-  ButtplugMessageValidator,
-  ButtplugMessageFinalizer,
-  ButtplugServerMessageType,
-)]
-#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
-pub enum ButtplugSpecV1ServerMessage {
-  // Status messages
-  Ok(Ok),
-  Error(ErrorV0),
-  Log(Log),
-  // Handshake messages
-  ServerInfo(ServerInfoV0),
-  // Device enumeration messages
-  DeviceList(DeviceListV1),
-  DeviceAdded(DeviceAddedV1),
-  DeviceRemoved(DeviceRemoved),
-  ScanningFinished(ScanningFinished),
-}
-
-// This was implementated as a derive, but for some reason the .into() calls
-// wouldn't work correctly when used as a device. If the actual implementation
-// is here, things work fine. Luckily it won't ever be changed much.
-impl TryFrom<ButtplugServerMessage> for ButtplugSpecV1ServerMessage {
-  type Error = ButtplugMessageError;
-  fn try_from(msg: ButtplugServerMessage) -> Result<Self, ButtplugMessageError> {
-    match msg {
-      ButtplugServerMessage::Ok(msg) => Ok(ButtplugSpecV1ServerMessage::Ok(msg)),
-      ButtplugServerMessage::Error(msg) => Ok(ButtplugSpecV1ServerMessage::Error(msg.into())),
-      ButtplugServerMessage::Log(msg) => Ok(ButtplugSpecV1ServerMessage::Log(msg)),
-      ButtplugServerMessage::ServerInfo(msg) => {
-        Ok(ButtplugSpecV1ServerMessage::ServerInfo(msg.into()))
-      }
-      ButtplugServerMessage::DeviceList(msg) => {
-        Ok(ButtplugSpecV1ServerMessage::DeviceList(msg.into()))
-      }
-      ButtplugServerMessage::DeviceAdded(msg) => {
-        Ok(ButtplugSpecV1ServerMessage::DeviceAdded(msg.into()))
-      }
-      ButtplugServerMessage::DeviceRemoved(msg) => {
-        Ok(ButtplugSpecV1ServerMessage::DeviceRemoved(msg))
-      }
-      ButtplugServerMessage::ScanningFinished(msg) => {
-        Ok(ButtplugSpecV1ServerMessage::ScanningFinished(msg))
-      }
-      _ => Err(ButtplugMessageError::VersionError(
-        "ButtplugServerMessage".to_owned(),
-        format!("{:?}", msg),
-        "ButtplugSpecV1ServerMessage".to_owned(),
-      )),
-    }
-  }
-}
-
-/// Represents all client-to-server messages in v0 of the Buttplug Spec
-#[derive(
-  Debug,
-  Clone,
-  PartialEq,
-  ButtplugMessage,
-  ButtplugMessageValidator,
-  ButtplugClientMessageType,
-  ButtplugMessageFinalizer,
-  TryFromButtplugClientMessage,
-)]
-#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
-pub enum ButtplugSpecV0ClientMessage {
-  RequestLog(RequestLog),
-  Ping(Ping),
-  // Handshake messages
-  RequestServerInfo(RequestServerInfo),
-  // Device enumeration messages
-  StartScanning(StartScanning),
-  StopScanning(StopScanning),
-  RequestDeviceList(RequestDeviceList),
-  // Generic commands
-  StopAllDevices(StopAllDevices),
-  StopDeviceCmd(StopDeviceCmd),
-  // Deprecated generic commands
-  SingleMotorVibrateCmd(SingleMotorVibrateCmd),
-  // Deprecated device specific commands
-  FleshlightLaunchFW12Cmd(FleshlightLaunchFW12Cmd),
-  LovenseCmd(LovenseCmd),
-  KiirooCmd(KiirooCmd),
-  VorzeA10CycloneCmd(VorzeA10CycloneCmd),
-}
-
-/// Represents all server-to-client messages in v0 of the Buttplug Spec
-#[derive(
-  Debug,
-  Clone,
-  PartialEq,
-  Eq,
-  ButtplugMessage,
-  ButtplugMessageValidator,
-  ButtplugMessageFinalizer,
-  ButtplugServerMessageType,
-)]
-#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
-pub enum ButtplugSpecV0ServerMessage {
-  // Status messages
-  Ok(Ok),
-  Error(ErrorV0),
-  Log(Log),
-  // Handshake messages
-  ServerInfo(ServerInfoV0),
-  // Device enumeration messages
-  DeviceList(DeviceListV0),
-  DeviceAdded(DeviceAddedV0),
-  DeviceRemoved(DeviceRemoved),
-  ScanningFinished(ScanningFinished),
-}
-
-// This was implementated as a derive, but for some reason the .into() calls
-// wouldn't work correctly when used as a device. If the actual implementation
-// is here, things work fine. Luckily it won't ever be changed much.
-impl TryFrom<ButtplugServerMessage> for ButtplugSpecV0ServerMessage {
-  type Error = ButtplugMessageError;
-  fn try_from(msg: ButtplugServerMessage) -> Result<Self, ButtplugMessageError> {
-    match msg {
-      ButtplugServerMessage::Ok(msg) => Ok(ButtplugSpecV0ServerMessage::Ok(msg)),
-      ButtplugServerMessage::Error(msg) => Ok(ButtplugSpecV0ServerMessage::Error(msg.into())),
-      ButtplugServerMessage::Log(msg) => Ok(ButtplugSpecV0ServerMessage::Log(msg)),
-      ButtplugServerMessage::ServerInfo(msg) => {
-        Ok(ButtplugSpecV0ServerMessage::ServerInfo(msg.into()))
-      }
-      ButtplugServerMessage::DeviceList(msg) => {
-        Ok(ButtplugSpecV0ServerMessage::DeviceList(msg.into()))
-      }
-      ButtplugServerMessage::DeviceAdded(msg) => {
-        Ok(ButtplugSpecV0ServerMessage::DeviceAdded(msg.into()))
-      }
-      ButtplugServerMessage::DeviceRemoved(msg) => {
-        Ok(ButtplugSpecV0ServerMessage::DeviceRemoved(msg))
-      }
-      ButtplugServerMessage::ScanningFinished(msg) => {
-        Ok(ButtplugSpecV0ServerMessage::ScanningFinished(msg))
-      }
-      _ => Err(ButtplugMessageError::VersionError(
-        "ButtplugServerMessage".to_owned(),
-        format!("{:?}", msg),
-        "ButtplugSpecV0ServerMessage".to_owned(),
-      )),
-    }
-  }
-}
 /// Represents messages that should go to the
 /// [DeviceManager][crate::server::device_manager::DeviceManager] of a
 /// [ButtplugServer](crate::server::ButtplugServer)

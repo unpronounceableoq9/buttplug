@@ -13,10 +13,77 @@ use getset::{CopyGetters, Getters};
 #[cfg(feature = "serialize-json")]
 use serde::{Deserialize, Serialize};
 
+
 /// Notification that a device has been found and connected to the server.
 #[derive(ButtplugMessage, Clone, Debug, PartialEq, Eq, Getters, CopyGetters)]
 #[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
 pub struct DeviceAdded {
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Id"))]
+  id: u32,
+  // DeviceAdded is not considered a device message because it only notifies of existence and is not
+  // a command (and goes from server to client), therefore we have to define the getter ourselves.
+  #[cfg_attr(feature = "serialize-json", serde(rename = "DeviceIndex"))]
+  #[getset(get_copy = "pub")]
+  device_index: u32,
+  #[cfg_attr(feature = "serialize-json", serde(rename = "DeviceName"))]
+  #[getset(get = "pub")]
+  device_name: String,
+  #[cfg_attr(
+    feature = "serialize-json",
+    serde(rename = "DeviceDisplayName", skip_serializing_if = "Option::is_none")
+  )]
+  #[getset(get = "pub")]
+  device_display_name: Option<String>,
+  #[cfg_attr(
+    feature = "serialize-json",
+    serde(
+      rename = "DeviceMessageTimingGap",
+      skip_serializing_if = "Option::is_none"
+    )
+  )]
+  #[getset(get = "pub")]
+  device_message_timing_gap: Option<u32>,
+  #[cfg_attr(feature = "serialize-json", serde(rename = "DeviceFeatures"))]
+  #[getset(get = "pub")]
+  device_features: Vec<DeviceFeature>,
+}
+
+impl DeviceAdded {
+  pub fn new(
+    device_index: u32,
+    device_name: &str,
+    device_display_name: &Option<String>,
+    device_message_timing_gap: &Option<u32>,
+    device_features: &Vec<DeviceFeature>
+  ) -> Self {
+    let mut obj = Self {
+      id: 0,
+      device_index,
+      device_name: device_name.to_string(),
+      device_display_name: device_display_name.clone(),
+      device_message_timing_gap: *device_message_timing_gap,
+      device_features: device_features.clone(),
+    };
+    obj
+  }
+}
+
+impl ButtplugMessageValidator for DeviceAdded {
+  fn is_valid(&self) -> Result<(), ButtplugMessageError> {
+    self.is_system_id(self.id)
+  }
+}
+
+impl ButtplugMessageFinalizer for DeviceAdded {
+  fn finalize(&mut self) {
+      
+  }
+}
+
+/// Notification that a device has been found and connected to the server.
+#[derive(ButtplugMessage, Clone, Debug, PartialEq, Eq, Getters, CopyGetters)]
+#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
+pub struct DeviceAddedV3 {
   #[cfg_attr(feature = "serialize-json", serde(rename = "Id"))]
   id: u32,
   // DeviceAdded is not considered a device message because it only notifies of existence and is not
@@ -47,7 +114,7 @@ pub struct DeviceAdded {
   device_messages: ClientDeviceMessageAttributes,
 }
 
-impl DeviceAdded {
+impl DeviceAddedV3 {
   pub fn new(
     device_index: u32,
     device_name: &str,
@@ -68,15 +135,32 @@ impl DeviceAdded {
   }
 }
 
-impl ButtplugMessageValidator for DeviceAdded {
+impl ButtplugMessageValidator for DeviceAddedV3 {
   fn is_valid(&self) -> Result<(), ButtplugMessageError> {
     self.is_system_id(self.id)
   }
 }
 
-impl ButtplugMessageFinalizer for DeviceAdded {
+impl ButtplugMessageFinalizer for DeviceAddedV3 {
   fn finalize(&mut self) {
     self.device_messages.finalize();
+  }
+}
+
+
+impl From<DeviceAdded> for DeviceAddedV3 {
+  fn from(msg: DeviceAdded) -> Self {
+    let id = msg.id();
+    let dmiv3 = DeviceMessageInfoV3::from(msg);
+
+    Self {
+      id,
+      device_index: dmiv3.device_index(),
+      device_name: dmiv3.device_name().clone(),
+      device_display_name: dmiv3.device_display_name().clone(),
+      device_message_timing_gap: dmiv3.device_message_timing_gap().clone(),
+      device_messages: dmiv3.device_messages().clone(),
+    }
   }
 }
 
@@ -99,14 +183,14 @@ pub struct DeviceAddedV2 {
 impl From<DeviceAdded> for DeviceAddedV2 {
   fn from(msg: DeviceAdded) -> Self {
     let id = msg.id();
-    let dmi = DeviceMessageInfo::from(msg);
-    let dmiv1 = DeviceMessageInfoV2::from(dmi);
+    let dmiv3 = DeviceMessageInfoV3::from(msg);
+    let dmiv2 = DeviceMessageInfoV2::from(dmiv3);
 
     Self {
       id,
-      device_index: dmiv1.device_index(),
-      device_name: dmiv1.device_name().clone(),
-      device_messages: dmiv1.device_messages().clone(),
+      device_index: dmiv2.device_index(),
+      device_name: dmiv2.device_name().clone(),
+      device_messages: dmiv2.device_messages().clone(),
     }
   }
 }
@@ -139,7 +223,7 @@ pub struct DeviceAddedV1 {
 impl From<DeviceAdded> for DeviceAddedV1 {
   fn from(msg: DeviceAdded) -> Self {
     let id = msg.id();
-    let dmi = DeviceMessageInfo::from(msg);
+    let dmi = DeviceMessageInfoV3::from(msg);
     let dmiv2 = DeviceMessageInfoV2::from(dmi);
     let dmiv1 = DeviceMessageInfoV1::from(dmiv2);
 
@@ -161,6 +245,7 @@ impl ButtplugMessageValidator for DeviceAddedV1 {
 impl ButtplugMessageFinalizer for DeviceAddedV1 {
 }
 
+
 #[derive(Default, ButtplugMessage, Clone, Debug, PartialEq, Eq, Getters, CopyGetters)]
 #[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
 pub struct DeviceAddedV0 {
@@ -180,7 +265,7 @@ pub struct DeviceAddedV0 {
 impl From<DeviceAdded> for DeviceAddedV0 {
   fn from(msg: DeviceAdded) -> Self {
     let id = msg.id();
-    let dmi = DeviceMessageInfo::from(msg);
+    let dmi = DeviceMessageInfoV3::from(msg);
     let dmiv2 = DeviceMessageInfoV2::from(dmi);
     let dmiv1 = DeviceMessageInfoV1::from(dmiv2);
     let dmiv0 = DeviceMessageInfoV0::from(dmiv1);

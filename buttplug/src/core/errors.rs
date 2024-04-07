@@ -8,14 +8,7 @@
 //! Buttplug Error Structs/Enums, representing protocol errors.
 
 use super::message::{
-  self,
-  serializer::ButtplugSerializerError,
-  ActuatorType,
-  ButtplugDeviceMessageType,
-  ButtplugMessageSpecVersion,
-  Endpoint,
-  ErrorCode,
-  SensorType,
+  self, serializer::ButtplugSerializerError, ActuatorType, ButtplugDeviceMessageType, ButtplugMessageSpecVersion, Endpoint, ErrorCode, FeatureType, SensorType
 };
 #[cfg(feature = "server")]
 use crate::server::device::hardware::communication::HardwareSpecificError;
@@ -174,9 +167,7 @@ pub enum ButtplugDeviceError {
   /// Device Configuration Error: {0}
   DeviceConfigurationError(String),
   /// Actuator Type Mismatch: Index {0} got command for {1}, but expects {2}
-  DeviceActuatorTypeMismatch(String, ActuatorType, ActuatorType),
-  /// Sensor Type Mismatch: Index {0} got command for {1}, but expects {2}
-  DeviceSensorTypeMismatch(u32, SensorType, SensorType),
+  DeviceFeatureTypeMismatch(String, FeatureType, FeatureType),
   /// Protocol does not have an implementation available for Sensor Type {0}
   ProtocolSensorNotSupported(SensorType),
 }

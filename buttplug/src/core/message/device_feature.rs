@@ -10,7 +10,7 @@ use getset::{Getters, MutGetters, Setters};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, ops::RangeInclusive};
 
-use super::endpoint;
+use super::{ActuatorType, SensorType};
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FeatureType {
@@ -24,10 +24,6 @@ pub enum FeatureType {
   // For instances where we specify a position to move to ASAP. Usually servos, probably for the
   // OSR-2/SR-6.
   Position,
-  // For RotateCmd,
-  RotateWithDirection,  
-  // For LinearCmd
-  PositionWithDuration,
   // Sensor Types
   Battery,
   RSSI,
@@ -45,6 +41,32 @@ pub enum FeatureType {
 impl Default for FeatureType {
   fn default() -> Self {
     FeatureType::Unknown
+  }
+}
+
+impl From<ActuatorType> for FeatureType {
+  fn from(value: ActuatorType) -> Self {
+    match value {
+      ActuatorType::Unknown =>   FeatureType::Unknown,
+      ActuatorType::Vibrate =>   FeatureType::Vibrate,
+      ActuatorType::Rotate =>    FeatureType::Rotate,
+      ActuatorType::Oscillate => FeatureType::Oscillate,
+      ActuatorType::Constrict => FeatureType::Constrict,
+      ActuatorType::Inflate =>   FeatureType::Inflate,
+      ActuatorType::Position =>  FeatureType::Position,
+    }
+  }
+}
+
+impl From<SensorType> for FeatureType {
+  fn from(value: SensorType) -> Self {
+    match value {
+      SensorType::Unknown =>  FeatureType::Unknown,
+      SensorType::Battery =>  FeatureType::Battery,
+      SensorType::RSSI =>     FeatureType::RSSI,
+      SensorType::Button =>   FeatureType::Button,
+      SensorType::Pressure => FeatureType::Pressure,
+    }
   }
 }
 

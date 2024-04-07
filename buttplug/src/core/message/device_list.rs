@@ -5,7 +5,7 @@
 // Licensed under the BSD 3-Clause license. See LICENSE file in the project root
 // for full license information.
 
-use super::device_message_info::{DeviceMessageInfoV0, DeviceMessageInfoV1, DeviceMessageInfoV2};
+use super::device_message_info::{DeviceMessageInfoV0, DeviceMessageInfoV1, DeviceMessageInfoV2, DeviceMessageInfo, DeviceMessageInfoV3};
 use super::*;
 use getset::Getters;
 #[cfg(feature = "serialize-json")]
@@ -36,8 +36,49 @@ impl ButtplugMessageValidator for DeviceList {
 
 impl ButtplugMessageFinalizer for DeviceList {
   fn finalize(&mut self) {
+  }
+}
+
+/// List of all devices currently connected to the server.
+#[derive(Default, Clone, Debug, PartialEq, Eq, ButtplugMessage, Getters)]
+#[cfg_attr(feature = "serialize-json", derive(Serialize, Deserialize))]
+pub struct DeviceListV3 {
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Id"))]
+  id: u32,
+  #[cfg_attr(feature = "serialize-json", serde(rename = "Devices"))]
+  #[getset(get = "pub")]
+  devices: Vec<DeviceMessageInfoV3>,
+}
+
+impl DeviceListV3 {
+  pub fn new(devices: Vec<DeviceMessageInfoV3>) -> Self {
+    Self { id: 1, devices }
+  }
+}
+
+impl ButtplugMessageValidator for DeviceListV3 {
+  fn is_valid(&self) -> Result<(), ButtplugMessageError> {
+    self.is_not_system_id(self.id)
+  }
+}
+
+impl ButtplugMessageFinalizer for DeviceListV3 {
+  fn finalize(&mut self) {
     for device in &mut self.devices {
       device.device_messages_mut().finalize();
+    }
+  }
+}
+
+impl From<DeviceList> for DeviceListV3 {
+  fn from(msg: DeviceList) -> Self {
+    let mut devices = vec![];
+    for d in msg.devices {
+      devices.push(DeviceMessageInfoV3::from(d));
+    }
+    Self {
+      id: msg.id,
+      devices,
     }
   }
 }
@@ -56,7 +97,9 @@ impl From<DeviceList> for DeviceListV2 {
   fn from(msg: DeviceList) -> Self {
     let mut devices = vec![];
     for d in msg.devices {
-      devices.push(DeviceMessageInfoV2::from(d));
+      let dmiv3 = DeviceMessageInfoV3::from(d);
+      let dmiv2 = DeviceMessageInfoV2::from(dmiv3);
+      devices.push(dmiv2);
     }
     Self {
       id: msg.id,
@@ -88,7 +131,8 @@ impl From<DeviceList> for DeviceListV1 {
   fn from(msg: DeviceList) -> Self {
     let mut devices = vec![];
     for d in msg.devices {
-      let dmiv2 = DeviceMessageInfoV2::from(d);
+      let dmiv3 = DeviceMessageInfoV3::from(d);
+      let dmiv2 = DeviceMessageInfoV2::from(dmiv3);
       devices.push(DeviceMessageInfoV1::from(dmiv2));
     }
     Self {
@@ -121,7 +165,8 @@ impl From<DeviceList> for DeviceListV0 {
   fn from(msg: DeviceList) -> Self {
     let mut devices = vec![];
     for d in msg.devices {
-      let dmiv2 = DeviceMessageInfoV2::from(d);
+      let dmiv3 = DeviceMessageInfoV3::from(d);
+      let dmiv2 = DeviceMessageInfoV2::from(dmiv3);
       let dmiv1 = DeviceMessageInfoV1::from(dmiv2);
       devices.push(DeviceMessageInfoV0::from(dmiv1));
     }

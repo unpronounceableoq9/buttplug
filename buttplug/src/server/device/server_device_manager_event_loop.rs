@@ -287,7 +287,7 @@ impl ServerDeviceManagerEventLoop {
           &device.name(),
           &device.display_name(),
           &None,
-          &device.features().into(),
+          &device.features(),
         );
         self.device_map.insert(device_index, device);
         // After that, we can send out to the server's event listeners to let
