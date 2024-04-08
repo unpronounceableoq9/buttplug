@@ -217,14 +217,28 @@ impl ServerDevice {
 
     // Since we're converting our configuration before we actually create Message Spec v4, we make a
     // map of our features that mirrors the old first class message type system assumed by v3 spec messages.
-    let spec_v3_conversion_map: HashMap<ButtplugDeviceMessageType, Vec<DeviceFeature>> = HashMap::new();
+    let mut spec_v3_conversion_map: HashMap<ButtplugDeviceMessageType, Vec<DeviceFeature>> = HashMap::new();
     for feature in attributes.features() {
-      for message in feature.actuator().unwrap_or_default().messages() {
+      for message in feature.actuator().clone().unwrap_or_default().messages() {
+        spec_v3_conversion_map.entry(*message).or_default().push(feature.clone());
+        // Legacy support for VibrateCmd.
+        if (*message == ButtplugDeviceMessageType::ScalarCmd && *feature.feature_type() == FeatureType::Vibrate) {
+          spec_v3_conversion_map.entry(ButtplugDeviceMessageType::VibrateCmd).or_default().push(feature.clone());
+        }
+      }
+      for message in feature.sensor().clone().unwrap_or_default().messages() {
+        spec_v3_conversion_map.entry(*message).or_default().push(feature.clone());
+        // Legacy support for VibrateCmd.
+        if (*message == ButtplugDeviceMessageType::SensorReadCmd && *feature.feature_type() == FeatureType::Battery) {
+          spec_v3_conversion_map.entry(ButtplugDeviceMessageType::BatteryLevelCmd).or_default().push(feature.clone());
+        }
+      }
+      for message in feature.raw().clone().unwrap_or_default().messages() {
         spec_v3_conversion_map.entry(*message).or_default().push(feature.clone());
       }
     }
 
-    let gcm = GenericCommandManager::new(attributes);
+    let gcm = GenericCommandManager::new(attributes.features());
 
     // If we've gotten here, we know our hardware is connected. This means we can start the keepalive if it's required.
     if hardware.requires_keepalive()
@@ -606,7 +620,14 @@ impl ServerDevice {
     sensor_index: &u32,
     sensor_type: &SensorType,
   ) -> Result<(), ButtplugDeviceError> {
-    if let Some(feature) = self.features().get(*sensor_index as usize) {
+    if let Some(feature_list) = self.spec_v3_conversion_map.get(&message) {
+      if (feature_list.len() < *sensor_index as usize) {
+        return Err(ButtplugDeviceError::DeviceSensorIndexError(
+          self.features().len() as u32,
+          *sensor_index,
+        ));
+      }
+      let feature = &feature_list[*sensor_index as usize];
       if *feature.feature_type() == FeatureType::from(*sensor_type) {
         Ok(())
       } else {
@@ -794,7 +815,7 @@ impl ServerDevice {
       if *sensor.feature_type() == FeatureType::Battery {
         let sensor_read_msg = SensorReadCmd::new(0, index as u32, SensorType::Battery);
         let sensor_read = self.handle_sensor_read_cmd(sensor_read_msg);
-        let sensor_range_end = *sensor.sensor().unwrap().value_range()[0].end();
+        let sensor_range_end = *sensor.sensor().clone().unwrap().value_range()[0].end();
         return async move {
           let return_msg = sensor_read.await?;
           if let ButtplugServerMessage::SensorReading(reading) = return_msg {

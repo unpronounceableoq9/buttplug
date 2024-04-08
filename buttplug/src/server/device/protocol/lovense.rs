@@ -158,7 +158,7 @@ impl ProtocolInitializer for LovenseInitializer {
     let scalar_count = attributes
     .features()
     .iter()
-    .filter(|x| x.actuator().and_then(|y| if y.messages().contains(&message::ButtplugDeviceMessageType::ScalarCmd) {
+    .filter(|x| x.actuator().as_ref().and_then(|y| if y.messages().contains(&message::ButtplugDeviceMessageType::ScalarCmd) {
       Some(y)
     } else {
       None

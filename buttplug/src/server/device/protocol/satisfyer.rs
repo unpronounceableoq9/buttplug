@@ -93,7 +93,7 @@ impl ProtocolInitializer for SatisfyerInitializer {
     let mut feature_count = attributes
     .features()
     .iter()
-    .filter(|x| x.actuator().and_then(|x| if x.messages().contains(&message::ButtplugDeviceMessageType::ScalarCmd) {
+    .filter(|x| x.actuator().as_ref().and_then(|x| if x.messages().contains(&message::ButtplugDeviceMessageType::ScalarCmd) {
       Some(x)
     } else {
       None

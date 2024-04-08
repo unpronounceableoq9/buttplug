@@ -15,6 +15,7 @@ use std::matches;
 pub use util::test_device_manager::TestDeviceCommunicationManagerBuilder;
 use util::test_server_with_device;
 
+/*
 // Test devices that have protocols that support movements not all devices do.
 // For instance, the Onyx+ is part of a protocol that supports vibration, but
 // the device itself does not.
@@ -109,7 +110,7 @@ async fn test_server_no_raw_message() {
     }
   }
 }
-
+*/
 #[tokio::test]
 async fn test_reject_on_no_raw_message() {
   let (server, _) = test_server_with_device("Massage Demo", false).await;

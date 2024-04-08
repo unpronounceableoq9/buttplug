@@ -353,7 +353,7 @@ impl ServerDeviceManager {
   pub fn device_info(&self, index: u32) -> Option<ServerDeviceInfo> {
     self.devices.get(&index).map(|device| ServerDeviceInfo {
       identifier: device.value().identifier().clone(),
-      display_name: *device.value().display_name(),
+      display_name: device.value().display_name().clone(),
     })
   }
 

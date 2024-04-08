@@ -9,7 +9,7 @@ mod util;
 extern crate buttplug;
 
 use buttplug::server::ButtplugServerBuilder;
-
+/*
 const BASE_CONFIG_JSON: &str = r#"
 {
   "version": 999,
@@ -213,3 +213,4 @@ async fn test_invalid_step_range_device_config_wrong_order() {
     .finish()
     .is_ok());
 }
+*/

@@ -444,7 +444,7 @@ impl DeviceConfigurationManagerBuilder {
         continue;
       }
 
-      attribute_tree_map.insert(ident.clone(), Arc::new(*attr));
+      attribute_tree_map.insert(ident.clone(), Arc::new(attr.clone()));
     }
 
     // Align the implementation, communication specifier, and attribute maps so we only keep what we

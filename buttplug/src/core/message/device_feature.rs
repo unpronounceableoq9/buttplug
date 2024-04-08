@@ -81,20 +81,21 @@ impl From<SensorType> for FeatureType {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Getters, MutGetters, Setters, Serialize, Deserialize)]
 pub struct DeviceFeature {
   #[getset(get="pub", get_mut = "pub(super)")]
+  #[serde(default)]
   description: String,
   #[getset(get = "pub")]
-  #[serde(rename = "FeatureType")]
+  #[serde(rename = "feature-type")]
   feature_type: FeatureType,
   #[getset(get="pub")]
   #[serde(skip_serializing_if = "Option::is_none")]
-  #[serde(rename = "Actuator")]
+  #[serde(rename = "actuator")]
   actuator: Option<DeviceFeatureActuator>,
   #[getset(get="pub")]
   #[serde(skip_serializing_if = "Option::is_none")]
-  #[serde(rename = "Sensor")]
+  #[serde(rename = "sensor")]
   sensor: Option<DeviceFeatureSensor>,
   #[getset(get="pub")]
-  #[serde(rename = "Raw")]
+  #[serde(rename = "raw")]
   raw: Option<DeviceFeatureRaw>
 }
 
@@ -114,12 +115,14 @@ impl DeviceFeature {
 pub struct DeviceFeatureActuator {
   #[getset(get = "pub", get_mut = "pub(super)")]
   #[serde(rename = "StepCount")]
+  #[serde(default)]
   step_count: u32,
+  // Option in order to share this struct between server (where it will exist) and client (where it won't exist)
   #[getset(get = "pub")]
   #[serde(skip)]
   step_range: Option<RangeInclusive<u32>>,
   #[getset(get = "pub")]
-  #[serde(rename = "Messages")]
+  #[serde(rename = "messages")]
   messages: HashSet<ButtplugDeviceMessageType>
 }
 
@@ -144,10 +147,10 @@ impl DeviceFeatureActuator {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Getters, MutGetters, Setters, Serialize, Deserialize)]
 pub struct DeviceFeatureSensor {
   #[getset(get = "pub", get_mut = "pub(super)")]
-  #[serde(rename = "ValueRange")]
+  #[serde(rename = "value-range")]
   value_range: Vec<RangeInclusive<i32>>,
   #[getset(get = "pub")]
-  #[serde(rename = "Messages")]
+  #[serde(rename = "messages")]
   messages: HashSet<ButtplugDeviceMessageType>
 }
 

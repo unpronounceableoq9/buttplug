@@ -9,13 +9,7 @@ use crate::{
   core::{
     errors::{ButtplugDeviceError, ButtplugError},
     message::{
-      ActuatorType,
-      ButtplugDeviceCommandMessageUnion,
-      LinearCmd,
-      RotateCmd,
-      RotationSubcommand,
-      ScalarCmd,
-      ScalarSubcommand,
+      ActuatorType, ButtplugDeviceCommandMessageUnion, DeviceFeature, LinearCmd, RotateCmd, RotationSubcommand, ScalarCmd, ScalarSubcommand
     },
   },
   server::device::configuration::ProtocolDeviceAttributes,
@@ -23,25 +17,14 @@ use crate::{
 use getset::Getters;
 use std::{
   ops::RangeInclusive,
-  sync::atomic::{AtomicBool, AtomicU32, Ordering::SeqCst},
+  sync::atomic::{AtomicBool, AtomicU32, Ordering::Relaxed},
 };
 
-#[derive(Getters)]
+#[derive(Getters, Default)]
 #[getset(get = "pub")]
-struct ScalarGenericCommand {
-  actuator: ActuatorType,
-  step_range: RangeInclusive<u32>,
-  value: AtomicU32,
-}
-
-impl ScalarGenericCommand {
-  pub fn new(features: &ServerGenericDeviceMessageAttributes) -> Self {
-    Self {
-      actuator: *attributes.actuator_type(),
-      step_range: attributes.step_range().clone(),
-      value: AtomicU32::new(0),
-    }
-  }
+struct CommandCache {
+  scalar: AtomicU32,
+  rotation_clockwise: AtomicBool,
 }
 
 // In order to make our lives easier, we make some assumptions about what's internally mutable in
@@ -56,69 +39,64 @@ pub struct GenericCommandManager {
   sent_scalar: AtomicBool,
   sent_rotation: AtomicBool,
   _sent_linear: bool,
-  scalars: Vec<ScalarGenericCommand>,
-  rotations: Vec<(AtomicU32, AtomicBool)>,
-  rotation_step_ranges: Vec<RangeInclusive<u32>>,
-  _linears: Vec<(u32, u32)>,
-  _linear_step_counts: Vec<u32>,
+  features: Vec<(DeviceFeature, CommandCache)>,
   stop_commands: Vec<ButtplugDeviceCommandMessageUnion>,
 }
 
 impl GenericCommandManager {
-  pub fn new(attributes: &ProtocolDeviceAttributes) -> Self {
-    let mut scalars = vec![];
-    let mut rotations = vec![];
-    let mut rotation_step_ranges = vec![];
-    let mut linears = vec![];
-    let mut linear_step_counts = vec![];
+  pub fn new(features: &Vec<DeviceFeature>) -> Self {
+
+    let feature_cache: Vec<(DeviceFeature, CommandCache)> = features.iter().map(|x| (x.clone(), CommandCache::default())).collect();
 
     let mut stop_commands = vec![];
-
-    if let Some(attrs) = attributes.message_attributes.scalar_cmd() {
-      let mut subcommands = vec![];
-      for (index, attr) in attrs.iter().enumerate() {
-        scalars.push(ScalarGenericCommand::new(attr));
-        subcommands.push(ScalarSubcommand::new(
+    let mut scalar_stop_subcommands = vec![];
+    let mut rotate_stop_subcommands = vec![];
+    features
+      .iter()
+      .filter(|x| {
+        if let Some(actuator) = x.actuator() {
+          actuator.messages().contains(&crate::core::message::ButtplugDeviceMessageType::ScalarCmd)
+        } else {
+          false
+        }
+      })
+      .enumerate()
+      .for_each(|(index, feature)| {
+        scalar_stop_subcommands.push(ScalarSubcommand::new(
           index as u32,
           0.0,
-          *attr.actuator_type(),
+          feature.feature_type().try_into().unwrap(),
         ));
-      }
-
-      stop_commands.push(ScalarCmd::new(0, subcommands).into());
-    }
-    if let Some(attrs) = attributes.message_attributes.rotate_cmd() {
-      rotations.resize_with(attrs.len(), || (AtomicU32::new(0), AtomicBool::new(false)));
-      for attr in attrs {
-        rotation_step_ranges.push(attr.step_range().clone());
-      }
-
-      // TODO Can we assume clockwise is false here? We might send extra
-      // messages on Lovense since it'll require both a speed and change
-      // direction command, but is that really a big deal? We can just
-      // have it ignore the direction difference on a 0.0 speed?
-      let mut subcommands = vec![];
-      for i in 0..rotations.len() {
-        subcommands.push(RotationSubcommand::new(i as u32, 0.0, false));
-      }
-      stop_commands.push(RotateCmd::new(0, subcommands).into());
-    }
-    if let Some(attrs) = attributes.message_attributes.linear_cmd() {
-      linears = vec![(0, 0); attrs.len()];
-      for attr in attrs {
-        linear_step_counts.push(attr.step_count());
-      }
+      });
+    if !scalar_stop_subcommands.is_empty() {
+      stop_commands.push(ScalarCmd::new(0, scalar_stop_subcommands).into());
     }
 
+    features
+    .iter()
+    .filter(|x| {
+      if let Some(actuator) = x.actuator() {
+        actuator.messages().contains(&crate::core::message::ButtplugDeviceMessageType::RotateCmd)
+      } else {
+        false
+      }
+    })
+    .enumerate()
+    .for_each(|(index, feature)| {
+      rotate_stop_subcommands.push(RotationSubcommand::new(
+        index as u32,
+        0.0,
+        false,
+      ));
+    });
+    if !rotate_stop_subcommands.is_empty() {
+      stop_commands.push(RotateCmd::new(0, rotate_stop_subcommands).into());
+    }
     Self {
       sent_scalar: AtomicBool::new(false),
       sent_rotation: AtomicBool::new(false),
       _sent_linear: false,
-      scalars,
-      rotations,
-      _linears: linears,
-      rotation_step_ranges,
-      _linear_step_counts: linear_step_counts,
+      features: feature_cache,
       stop_commands,
     }
   }
@@ -130,6 +108,8 @@ impl GenericCommandManager {
   ) -> Result<Vec<Option<(ActuatorType, u32)>>, ButtplugError> {
     // First, make sure this is a valid command, that contains at least one
     // subcommand.
+    //
+    // TODO this should be part of message validity checks.
     if msg.scalars().is_empty() {
       return Err(
         ButtplugDeviceError::ProtocolRequirementError(
@@ -139,31 +119,43 @@ impl GenericCommandManager {
       );
     }
 
+    let scalar_features: Vec<&(DeviceFeature, CommandCache)> = self
+      .features
+      .iter()
+      .filter(|(x, _)| {
+        if let Some(actuator) = x.actuator() {
+          actuator.messages().contains(&crate::core::message::ButtplugDeviceMessageType::ScalarCmd)
+        } else {
+          false
+        }
+      })
+      .collect();
+
     // Now we convert from the generic 0.0-1.0 range to the StepCount
     // attribute given by the device config.
 
     // If we've already sent commands before, we should check against our
     // old values. Otherwise, we should always send whatever command we're
     // going to send.
-    let mut result: Vec<Option<(ActuatorType, u32)>> = vec![None; self.scalars.len()];
+    let mut result: Vec<Option<(ActuatorType, u32)>> = vec![None; scalar_features.len()];
 
     for scalar_command in msg.scalars() {
       let index = scalar_command.index() as usize;
       // Since we're going to iterate here anyways, we do our index check
       // here instead of in a filter above.
-      if index >= self.scalars.len() {
+      if index >= scalar_features.len() {
         return Err(
           ButtplugDeviceError::ProtocolRequirementError(format!(
             "ScalarCmd has {} commands, device has {} features.",
             msg.scalars().len(),
-            self.scalars.len()
+            scalar_features.len()
           ))
           .into(),
         );
       }
 
-      let range_start = self.scalars[index].step_range().start();
-      let range = self.scalars[index].step_range().end() - range_start;
+      let range_start = scalar_features[index].0.actuator().as_ref().unwrap().step_range().as_ref().unwrap().start();
+      let range = scalar_features[index].0.actuator().as_ref().unwrap().step_range().as_ref().unwrap().end() - range_start;
       let scalar_modifier = scalar_command.scalar() * range as f64;
       let scalar = if scalar_modifier < 0.0001 {
         0
@@ -175,7 +167,7 @@ impl GenericCommandManager {
       };
       trace!(
         "{:?} {} {} {}",
-        self.scalars[index].step_range(),
+        scalar_features[index].0.actuator().as_ref().unwrap().step_range(),
         range,
         scalar_modifier,
         scalar
@@ -183,15 +175,15 @@ impl GenericCommandManager {
       // If we've already sent commands, we don't want to send them again,
       // because some of our communication busses are REALLY slow. Make sure
       // these values get None in our return vector.
-      let current_scalar = self.scalars[index].value().load(SeqCst);
-      let sent_scalar = self.sent_scalar.load(SeqCst);
+      let current_scalar = scalar_features[index].1.scalar().load(Relaxed);
+      let sent_scalar = self.sent_scalar.load(Relaxed);
       if !sent_scalar || scalar != current_scalar {
-        self.scalars[index].value().store(scalar, SeqCst);
-        result[index] = Some((*self.scalars[index].actuator(), scalar));
+        scalar_features[index].1.scalar().store(scalar, Relaxed);
+        result[index] = Some((scalar_features[index].0.feature_type().try_into().unwrap(), scalar));
       }
 
       if !sent_scalar {
-        self.sent_scalar.store(true, SeqCst);
+        self.sent_scalar.store(true, Relaxed);
       }
     }
 
@@ -202,9 +194,9 @@ impl GenericCommandManager {
     } else if match_all {
       // If we're in a match all situation, set up the array with all prior
       // values before switching them out.
-      for (index, cmd) in self.scalars.iter().enumerate() {
+      for (index, (_, cmd)) in scalar_features.iter().enumerate() {
         if result[index].is_none() {
-          result[index] = Some((*cmd.actuator(), cmd.value.load(SeqCst)));
+          result[index] = Some((scalar_features[index].0.feature_type().try_into().unwrap(), cmd.scalar().load(Relaxed)));
         }
       }
     }
@@ -217,9 +209,16 @@ impl GenericCommandManager {
   #[cfg(test)]
   pub(super) fn scalars(&self) -> Vec<Option<(ActuatorType, u32)>> {
     self
-      .scalars
+      .features
       .iter()
-      .map(|x| Some((*x.actuator(), x.value().load(SeqCst))))
+      .filter(|(x, _)| {
+        if let Some(actuator) = x.actuator() {
+          actuator.messages().contains(&crate::core::message::ButtplugDeviceMessageType::ScalarCmd)
+        } else {
+          false
+        }
+      })
+      .map(|(feature, cache)| Some((feature.feature_type().try_into().unwrap(), cache.scalar().load(Relaxed))))
       .collect()
   }
 
@@ -230,6 +229,7 @@ impl GenericCommandManager {
   ) -> Result<Vec<Option<(u32, bool)>>, ButtplugError> {
     // First, make sure this is a valid command, that contains at least one
     // command.
+    // TODO Move this to message validity checks
     if msg.rotations().is_empty() {
       return Err(
         ButtplugDeviceError::ProtocolRequirementError(
@@ -245,17 +245,30 @@ impl GenericCommandManager {
     // If we've already sent commands before, we should check against our
     // old values. Otherwise, we should always send whatever command we're
     // going to send.
-    let mut result: Vec<Option<(u32, bool)>> = vec![None; self.rotations.len()];
+    let rotate_features: Vec<&(DeviceFeature, CommandCache)> = self
+      .features
+      .iter()
+      .filter(|(x, _)| {
+        if let Some(actuator) = x.actuator() {
+          actuator.messages().contains(&crate::core::message::ButtplugDeviceMessageType::RotateCmd)
+        } else {
+          false
+        }
+      })
+      .collect();
+    let mut result: Vec<Option<(u32, bool)>> = vec![None; rotate_features.len()];
+
+    
     for rotate_command in msg.rotations() {
       let index = rotate_command.index() as usize;
       // Since we're going to iterate here anyways, we do our index check
       // here instead of in a filter above.
-      if index >= self.rotations.len() {
+      if index >= rotate_features.len() {
         return Err(
           ButtplugDeviceError::ProtocolRequirementError(format!(
             "RotateCmd has {} commands, device has {} rotators.",
             msg.rotations().len(),
-            self.rotations.len()
+            rotate_features.len()
           ))
           .into(),
         );
@@ -264,7 +277,8 @@ impl GenericCommandManager {
       // When calculating speeds, round up. This follows how we calculated
       // things in buttplug-js and buttplug-csharp, so it's more for history
       // than anything, but it's what users will expect.
-      let range = self.rotation_step_ranges[index].end() - self.rotation_step_ranges[index].start();
+      let range_start = rotate_features[index].0.actuator().as_ref().unwrap().step_range().as_ref().unwrap().start();
+      let range = rotate_features[index].0.actuator().as_ref().unwrap().step_range().as_ref().unwrap().end() - range_start;      
       let speed_modifier = rotate_command.speed() * range as f64;
       let speed = if speed_modifier < 0.0001 {
         0
@@ -272,32 +286,32 @@ impl GenericCommandManager {
         // When calculating speeds, round up. This follows how we calculated
         // things in buttplug-js and buttplug-csharp, so it's more for history
         // than anything, but it's what users will expect.
-        (speed_modifier + *self.rotation_step_ranges[index].start() as f64).ceil() as u32
+        (speed_modifier + *range_start as f64).ceil() as u32
       };
       let clockwise = rotate_command.clockwise();
       // If we've already sent commands, we don't want to send them again,
       // because some of our communication busses are REALLY slow. Make sure
       // these values get None in our return vector.
-      let sent_rotation = self.sent_rotation.load(SeqCst);
+      let sent_rotation = self.sent_rotation.load(Relaxed);
       if !sent_rotation
-        || speed != self.rotations[index].0.load(SeqCst)
-        || clockwise != self.rotations[index].1.load(SeqCst)
+        || speed != self.features[index].1.scalar().load(Relaxed)
+        || clockwise != self.features[index].1.rotation_clockwise().load(Relaxed)
       {
-        self.rotations[index].0.store(speed, SeqCst);
-        self.rotations[index].1.store(clockwise, SeqCst);
+        self.features[index].1.scalar().store(speed, Relaxed);
+        self.features[index].1.rotation_clockwise().store(clockwise, Relaxed);
         result[index] = Some((speed, clockwise));
       }
       if !sent_rotation {
-        self.sent_rotation.store(true, SeqCst);
+        self.sent_rotation.store(true, Relaxed);
       }
     }
 
     // If we're in a match all situation, set up the array with all prior
     // values before switching them out.
     if match_all && !result.iter().all(|x| x.is_none()) {
-      for (index, rotation) in self.rotations.iter().enumerate() {
+      for (index, (_, rotation)) in rotate_features.iter().enumerate() {
         if result[index].is_none() {
-          result[index] = Some((rotation.0.load(SeqCst), rotation.1.load(SeqCst)));
+          result[index] = Some((rotation.scalar().load(Relaxed), rotation.rotation_clockwise().load(Relaxed)));
         }
       }
     }

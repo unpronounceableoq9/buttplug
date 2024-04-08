@@ -191,7 +191,7 @@ async fn test_client_repeated_deviceadded_message() {
       "Test Device",
       &None,
       &None,
-      &ClientDeviceMessageAttributes::default(),
+      &vec![],
     );
     helper_clone
       .send_client_incoming(device_added.clone().into())
@@ -239,7 +239,7 @@ async fn test_client_repeated_deviceremoved_message() {
       "Test Device",
       &None,
       &None,
-      &ClientDeviceMessageAttributes::default(),
+      &vec![],
     );
     let device_removed = message::DeviceRemoved::new(1);
     helper_clone.send_client_incoming(device_added.into()).await;
